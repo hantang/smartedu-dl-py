@@ -2,22 +2,22 @@
 命令行版本：智慧教育平台资源下载工具
 """
 
+import logging
 import sys
 import time
-import logging
 from pathlib import Path
 from typing import List, Optional, Tuple
 
 import click
 from rich.console import Console
+from rich.progress import Progress
+from rich.progress import BarColumn, SpinnerColumn, TaskProgressColumn, TextColumn
 from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
 from tools.downloader import download_files, fetch_all_data
+from tools.logo import LOGO_TEXT2
 from tools.parser import extract_resource_url, parse_urls
 from tools.parser2 import fetch_metadata, gen_url_from_tags, query_metadata
-from tools.utils import format_bytes
-from tools.logo import LOGO_TEXT2
 
 # 配置日志
 logging.basicConfig(
@@ -165,11 +165,11 @@ def simple_download(urls, save_path, audio):
 
     # 下载文件
     with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        console=console,
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console,
     ) as progress:
         download_task = progress.add_task("正在下载文件...", total=total)
         results = download_files(resource_dict, save_path)
@@ -298,14 +298,7 @@ def interactive_download(default_output: str, audio: bool):
 @click.option("--urls", "-u", help="URL路径列表，用逗号分隔")
 @click.option("--list_file", "-f", type=click.Path(exists=True), help="包含URL的文件")
 @click.option("--output", "-o", type=click.Path(), default=DEFAULT_PATH, help="下载文件保存目录")
-def main(
-    debug: bool,
-    interactive: bool,
-    audio: bool,
-    urls: Optional[str],
-    list_file: Optional[str],
-    output: str,
-):
+def main(debug: bool, interactive: bool, audio: bool, urls: Optional[str], list_file: Optional[str], output: str):
     # 如果是请求帮助信息，不需要显示欢迎信息
     if any(arg in sys.argv[1:] for arg in ["-h", "--help"]):
         return

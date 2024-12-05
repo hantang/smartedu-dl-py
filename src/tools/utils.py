@@ -2,6 +2,7 @@ import logging
 import shutil
 from pathlib import Path
 from urllib.parse import urlparse
+
 from fake_useragent import UserAgent
 
 

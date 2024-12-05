@@ -11,9 +11,9 @@ import logging
 import shutil
 import tempfile
 import time
-from urllib.parse import urljoin, urlparse
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import as_completed, ThreadPoolExecutor
 from pathlib import Path
+from urllib.parse import urljoin, urlparse
 
 import m3u8
 import requests

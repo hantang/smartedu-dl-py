@@ -1,5 +1,5 @@
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import as_completed, ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
