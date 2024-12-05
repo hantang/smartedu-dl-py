@@ -2,7 +2,7 @@ import logging
 import shutil
 from pathlib import Path
 from urllib.parse import urlparse
-
+from fake_useragent import UserAgent
 
 def gen_filename(url, name, save_path, default="output.txt"):
     """确保文件名唯一，如果存在则添加添加(1), (2)等后缀"""
@@ -42,3 +42,9 @@ def clean_dir(temp_dir):
         shutil.rmtree(temp_dir)
     except Exception as e:
         logging.warning(f"清理临时文件失败: {e}")
+
+
+def get_headers():
+    ua = UserAgent(platforms=["pc"])
+    headers = {"User-Agent": ua.random}
+    return headers

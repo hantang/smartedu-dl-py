@@ -47,6 +47,7 @@ RESOURCE_DICT = {
         "resources": {
             "version": "https://s-file-1.ykt.cbern.com.cn/zxx/ndrs/resources/tch_material/version/data_version.json",
             "tag": "https://s-file-1.ykt.cbern.com.cn/zxx/ndrs/tags/tch_material_tag.json",
+            "detail": "https://basic.smartedu.cn/tchMaterial/detail?contentType=assets_document&contentId={contentId}",
         },
     },
     "/syncClassroom": {

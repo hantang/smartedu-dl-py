@@ -1,3 +1,4 @@
+import random
 import sys
 import time
 import logging
@@ -13,6 +14,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskPr
 
 from tools.downloader import download_files, fetch_all_data
 from tools.parser import extract_resource_url, parse_urls
+from tools.parser2 import fetch_metadata, gen_url_from_tags, query_metadata
 from tools.utils import format_bytes
 from tools.logo import LOGO_TEXT2
 
@@ -74,7 +76,7 @@ def display_urls(urls: List[str], title: str = "URL列表"):
     """显示URL列表"""
     click.secho(f"\n{title}:", fg="yellow")
     for i, url in enumerate(urls, 1):
-        click.echo(f"{i}. {url}")
+        click.echo(f"{i:>2d}. {url}")
 
 
 def display_results(results: List[dict], elapsed_time: float):
@@ -113,8 +115,73 @@ def display_results(results: List[dict], elapsed_time: float):
         console.print(result_table)
 
 
+def preprocess(list_file, urls):
+    # 获取预定义URL
+    predefined_urls = []
+    if list_file:
+        try:
+            with open(list_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        more_urls = [url.strip() for url in line.split(",") if url.strip()]
+                        predefined_urls.extend(more_urls)
+        except Exception as e:
+            logger.error(f"读取文件失败: {list_file}", exc_info=True)
+
+    if urls:
+        predefined_urls.extend(url.strip() for url in urls.split(",") if url.strip())
+    return predefined_urls
+
+
+def simple_download(urls, save_path, audio):
+    def _extract_resource_url(data):
+        suffix_list = ["pdf"]
+        if audio:
+            suffix_list.extend(["mp3"])
+        return extract_resource_url(data, suffix_list)
+
+    click.echo(
+        f"\n共选择 {click.style(str(len(urls)), fg='yellow')} 项目，"
+        f"将保存到 {click.style(str(save_path), fg='yellow')} 目录，"
+    )
+    config_urls = parse_urls(urls, audio)
+    resource_dict = fetch_all_data(config_urls, _extract_resource_url)
+    total = len(resource_dict)
+
+    click.echo(
+        f"\n共输入URL {click.style(str(len(urls)), fg='yellow')} 个，"
+        f"解析得到配置 {click.style(str(len(config_urls)), fg='yellow')} 个，"
+        f"有效的资源文件共 {click.style(str(total), fg='yellow')} 个"
+    )
+    if total == 0:
+        click.echo("\n没有找到资源文件（PDF/MP3等）。结束下载")
+        return
+
+    # 开始下载
+    start_time = time.time()
+    click.echo("\n开始下载文件...")
+
+    # 下载文件
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+    ) as progress:
+        download_task = progress.add_task("正在下载文件...", total=total)
+        results = download_files(resource_dict, save_path)
+        progress.update(download_task, completed=total)
+
+    # 显示统计信息
+    elapsed_time = time.time() - start_time
+    display_results(results, elapsed_time)
+
+
 def interactive_download(default_output: str, audio: bool):
     """交互式下载流程"""
+    hier_dict, tag_dict, id_dict = None, None, None
     while True:
         click.echo("\n请选择下载模式:")
         click.echo("1. 查询科目列表")
@@ -130,7 +197,45 @@ def interactive_download(default_output: str, audio: bool):
         # 获取URL列表
         urls_to_process = []
         if choice == "1":
-            click.echo("\n联网查询科目数据中……")
+            if hier_dict is None:
+                click.echo("\n联网查询科目数据中……")
+                hier_dict, tag_dict, id_dict = fetch_metadata()
+            if hier_dict is None:
+                click.secho("获取数据失败，稍后再试", fg="red")
+                continue
+
+            # while True:
+            key = hier_dict["next"][0]
+            tmp_hider_dict = hier_dict
+            last_name = ""
+            last_tmp_hider_dict = hier_dict
+            last_key = key
+            while True:
+                level, name, options, option_keys = query_metadata(
+                    key, tmp_hider_dict, tag_dict, id_dict
+                )
+
+                if len(option_keys) == 0:
+                    click.secho(f"当前{last_name}没有候选，请重新选择其他{last_name}", fg="red")
+                    tmp_hider_dict = last_tmp_hider_dict
+                    key = last_key
+                    continue
+                elif level == -1:
+                    break
+
+                display_urls(options, f"请选择以下一项 {last_name}【{name}】（共{len(options)}项）")
+                new_key_index = click.prompt("请输入", default="1", show_default=True).strip()
+                if new_key_index.isdigit() and 1 <= int(new_key_index) <= len(options):
+                    last_tmp_hider_dict = tmp_hider_dict
+                    last_key = key
+                    tmp_hider_dict = tmp_hider_dict[key]
+                    key = option_keys[int(new_key_index) - 1]
+                    last_name = options[int(new_key_index) - 1]
+                else:
+                    click.secho("输入不合法，请重新输入", fg="red")
+
+            display_urls(options, f"目前有{last_name}书册如下（共{len(options)}项）")
+            urls_to_process = gen_url_from_tags(option_keys)
 
         elif choice == "2":
             while True:
@@ -147,7 +252,7 @@ def interactive_download(default_output: str, audio: bool):
         while True:
             note = "输入序号或者序号范围，如: 1-3,5,7-9"
             click.echo(f"\n请选择要下载的URL（{note}）:")
-            range_input = click.prompt("请输入（默认选择全部）", default="A", show_default=False)
+            range_input = click.prompt("请输入（默认全部）", default="A", show_default=True)
 
             selected_indices = parse_range(range_input, len(urls_to_process))
             if selected_indices:
@@ -185,66 +290,6 @@ def interactive_download(default_output: str, audio: bool):
         if not click.confirm("\n是否继续下载?", default=True):
             click.echo("\n结束下载")
             break
-
-
-def preprocess(list_file, urls):
-    # 获取预定义URL
-    predefined_urls = []
-    if list_file:
-        try:
-            with open(list_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line:
-                        predefined_urls.extend(
-                            [url.strip() for url in line.split(",") if url.strip()]
-                        )
-        except Exception as e:
-            logger.error(f"读取文件失败: {list_file}", exc_info=True)
-
-    if urls:
-        predefined_urls.extend(url.strip() for url in urls.split(",") if url.strip())
-    return predefined_urls
-
-
-def simple_download(urls, save_path, audio):
-    def _extract_resource_url(data):
-        suffix_list = ["pdf"]
-        if audio:
-            suffix_list.extend(["mp3"])
-        return extract_resource_url(data, suffix_list)
-
-    click.secho(f"共选择 {len(urls)} 项， 保存到 {save_path}")
-    config_urls = parse_urls(urls, audio)
-    resource_dict = fetch_all_data(config_urls, _extract_resource_url)
-    total = len(resource_dict)
-
-    click.echo(
-        f"\n输入URL共 {len(urls)} 个，解析得到配置 {len(config_urls)} 个，有效的资源文件共 {total} 个"
-    )
-    if total == 0:
-        click.echo("\n没有找到资源文件（PDF/MP3等）。结束下载")
-        return
-
-    # 开始下载
-    start_time = time.time()
-    click.echo("\n开始下载文件...")
-
-    # 下载文件
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        console=console,
-    ) as progress:
-        download_task = progress.add_task("正在下载文件...", total=total)
-        results = download_files(resource_dict, save_path)
-        progress.update(download_task, completed=total)
-
-    # 显示统计信息
-    elapsed_time = time.time() - start_time
-    display_results(results, elapsed_time)
 
 
 @click.command()
