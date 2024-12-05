@@ -4,10 +4,9 @@ from pathlib import Path
 from typing import Callable
 
 import requests
-from fake_useragent import UserAgent
 from tqdm import tqdm
 
-from .utils import gen_filename
+from .utils import gen_filename, get_headers
 
 
 def download_file(url: str, headers: dict, timeout: int, chunk_size: int, file_path: str | Path):
@@ -21,7 +20,6 @@ def download_file(url: str, headers: dict, timeout: int, chunk_size: int, file_p
             out["code"] = response.status_code
             if response.ok:
                 total_size = int(response.headers.get("content-length", 0))
-
 
             with open(file_path, "wb") as file:
                 for data in response.iter_content(chunk_size=chunk_size):
@@ -48,8 +46,7 @@ def download_file(url: str, headers: dict, timeout: int, chunk_size: int, file_p
 
 
 def download_file2(url, name, save_dir, raw_url):
-    ua = UserAgent(platforms=["pc"])
-    headers = {"User-Agent": ua.random}
+    headers = get_headers()
     timeout = 10
     chunk_size = 16 * 1024  # 16k
     file_path = gen_filename(url, name, save_dir)
@@ -79,7 +76,7 @@ def download_files(url_dict: dict, output_dir: str, max_workers: int = 5) -> lis
 
 
 def fetch_single_data(
-    url: str, headers: dict, timeout: int, data_format: str = "json"
+        url: str, headers: dict, timeout: int, data_format: str = "json"
 ) -> list | dict | str | None:
     # 获取json配置
     response = requests.get(url, timeout=timeout, headers=headers)
@@ -95,8 +92,7 @@ def fetch_all_data(url_list: list, extract_func: Callable, max_workers: int = 5)
     """
     获取配置信息
     """
-    ua = UserAgent(platforms=["pc"])
-    headers = {"User-Agent": ua.random}
+    headers = get_headers()
     timeout = 5
     data_format = "json"
 

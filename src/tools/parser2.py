@@ -1,5 +1,9 @@
+"""
+smartedu教材等层级列表解析
+"""
 import json
 import requests
+
 from .parser import RESOURCE_DICT
 from .downloader import fetch_single_data
 from .utils import get_headers
@@ -71,6 +75,7 @@ def _parse_tag_dict(data):
 
 
 def fetch_metadata():
+    # 生成教材层级结构以及对应书名、ID等
     name = "/tchMaterial"  # TODO 目前仅教材，待支持课件
     resources = RESOURCE_DICT[name]["resources"]
     tag_url = resources["tag"]
@@ -110,8 +115,8 @@ def fetch_metadata():
                 if k not in tmp_hier_dict:
                     break
                 tmp_hier_dict = tmp_hier_dict[k]
-            if 'list' in tmp_hier_dict:
-                tmp_hier_dict['list'].append(k2)
+            if "list" in tmp_hier_dict and k2 not in tmp_hier_dict["list"]:
+                tmp_hier_dict["list"].append(k2)
             if k2:
                 hier_tags_title[k2] = e["title"]
                 hier_tags_id[k2] = e["id"]  # contentId
@@ -121,31 +126,29 @@ def fetch_metadata():
 
 
 def query_metadata(key, hier_dict, tag_dict, id_dict):
+    # 获得下一级列表
     data = hier_dict[key]
-    option_keys = []
-    option_names = []
-    level = data.get("level", -1)
 
+    options = []
     if "next" in data:
+        level = data["level"]
         name = data["name"]
         for k in data["next"]:
             if k and k in data:
-                option_keys.append(k)
-                option_names.append(data[k]["tag"])
+                options.append([k, data[k]["tag"]])
     else:
         level = -1
         name = "课本分册"
         for k in data["list"]:
             if k and k in tag_dict and k in id_dict:
-                option_keys.append(id_dict[k])
-                option_names.append(tag_dict[k])
-
-    return level, name, option_names, option_keys
+                options.append([id_dict[k], tag_dict[k]])
+    return level, name, options
 
 
-def gen_url_from_tags(tag_list):
+def gen_url_from_tags(content_id_list):
+    # 转化成URL
     name = "/tchMaterial"
     resources = RESOURCE_DICT[name]["resources"]
     example_url = resources["detail"]
-    urls = [example_url.format(contentId=tag_id) for tag_id in tag_list]
+    urls = [example_url.format(contentId=cid) for cid in content_id_list]
     return urls

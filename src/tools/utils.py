@@ -4,6 +4,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from fake_useragent import UserAgent
 
+
 def gen_filename(url, name, save_path, default="output.txt"):
     """确保文件名唯一，如果存在则添加添加(1), (2)等后缀"""
     save_path = Path(save_path)

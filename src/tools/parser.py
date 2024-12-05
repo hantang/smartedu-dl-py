@@ -1,7 +1,9 @@
+"""
+smartedu配置信息和解析
+"""
 import logging
 import random
 from urllib.parse import parse_qs, urlparse
-
 
 SERVER_LIST = [
     "s-file-1",
@@ -37,7 +39,6 @@ DOMAIN_REMAP_DICT = {
     "xue-test.ykt.eduyun.cn": "basic.smartedu.cn",
     "jpk-test.ykt.eduyun.cn": "jpk.basic.smartedu.cn",  # 基础教育精品课
 }
-
 
 RESOURCE_DICT = {
     "/tchMaterial": {
@@ -213,7 +214,8 @@ RESOURCE_DICT = {
         ],
         "resources": {
             "first": "https://{server}.ykt.cbern.com.cn/twy/s_course/v2/business_courses/{courseId}/course_relative_infos/zh-CN.json",
-            "second": "https://{server}.ykt.cbern.com.cn/twy/s_course/v2/activity_sets/{activity_set_id}/fulls.json",  # activity_set_id 来自zh-CN.json
+            "second": "https://{server}.ykt.cbern.com.cn/twy/s_course/v2/activity_sets/{activity_set_id}/fulls.json",
+            # activity_set_id 来自zh-CN.json
         },
     },
     "/art/courseDetail": {
@@ -224,7 +226,8 @@ RESOURCE_DICT = {
         ],
         "resources": {
             "first": "https://{server}.ykt.cbern.com.cn/twy/s_course/v2/business_courses/{courseId}/course_relative_infos/zh-CN.json",
-            "second": "https://{server}.ykt.cbern.com.cn/twy/s_course/v2/activity_sets/{activity_set_id}/fulls.json",  # activity_set_id 来自zh-CN.json
+            "second": "https://{server}.ykt.cbern.com.cn/twy/s_course/v2/activity_sets/{activity_set_id}/fulls.json",
+            # activity_set_id 来自zh-CN.json
         },
     },
 }

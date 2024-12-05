@@ -1,17 +1,25 @@
+"""
+m3u8视频下载，转换成mp4，仍有问题
+# TODO: 合并失败需要处理
+# 依赖：brew install ffmpeg
+# 现成工具：
+# - https://github.com/nilaoda/N_m3u8DL-RE
+# - https://github.com/nilaoda/N_m3u8DL-CLI (only windows)
+"""
+
 import logging
 import shutil
 import tempfile
+import time
 from urllib.parse import urljoin, urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import m3u8
 import requests
-from fake_useragent import UserAgent
 from tqdm import tqdm
-import time
 
-from .utils import clean_dir, gen_filename2
+from .utils import clean_dir, gen_filename2, get_headers
 
 
 def download_ts_file(url: str, output_path: str, headers: dict, timeout: int):
@@ -71,8 +79,7 @@ def download_ts_files(base_url, segments, temp_dir: str, max_workers: int):
     """
     并发下载所有ts文件，带重试和进度显示
     """
-    ua = UserAgent(platforms=["pc"])
-    headers = {"User-Agent": ua.random}
+    headers = get_headers()
     timeout = 30
 
     downloaded_files = []
@@ -191,12 +198,6 @@ def _merge_ts(downloaded_files, output_path):
 def m3u8_to_mp4(temp_dir: str, downloaded_files: list, output_path: Path) -> dict:
     """
     将下载的ts文件合并为mp4或ts文件
-
-    # TODO: 合并失败需要处理
-    # 依赖：brew install ffmpeg
-    # 现成工具：
-    # - https://github.com/nilaoda/N_m3u8DL-RE
-    # - https://github.com/nilaoda/N_m3u8DL-CLI (only windows)
     """
     result = {"status": "failed", "file": None, "size": 0}
 

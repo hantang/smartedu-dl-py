@@ -1,16 +1,17 @@
-import random
+"""
+命令行版本：智慧教育平台资源下载工具
+"""
+
 import sys
 import time
 import logging
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-
 import click
 from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
-
 
 from tools.downloader import download_files, fetch_all_data
 from tools.parser import extract_resource_url, parse_urls
@@ -205,37 +206,34 @@ def interactive_download(default_output: str, audio: bool):
                 continue
 
             # while True:
-            key = hier_dict["next"][0]
+            key_id = hier_dict["next"][0]
             tmp_hider_dict = hier_dict
             last_name = ""
             last_tmp_hider_dict = hier_dict
-            last_key = key
+            last_key_id = key_id
             while True:
-                level, name, options, option_keys = query_metadata(
-                    key, tmp_hider_dict, tag_dict, id_dict
-                )
-
-                if len(option_keys) == 0:
+                level, name, options = query_metadata(key_id, tmp_hider_dict, tag_dict, id_dict)
+                option_names = [op for _, op in options]
+                if len(options) == 0:
                     click.secho(f"当前{last_name}没有候选，请重新选择其他{last_name}", fg="red")
                     tmp_hider_dict = last_tmp_hider_dict
-                    key = last_key
+                    key_id = last_key_id
                     continue
                 elif level == -1:
                     break
 
-                display_urls(options, f"请选择以下一项 {last_name}【{name}】（共{len(options)}项）")
+                display_urls(option_names, f"请选择以下某项{last_name}【{name}】（共{len(options)}项）")
                 new_key_index = click.prompt("请输入", default="1", show_default=True).strip()
                 if new_key_index.isdigit() and 1 <= int(new_key_index) <= len(options):
                     last_tmp_hider_dict = tmp_hider_dict
-                    last_key = key
-                    tmp_hider_dict = tmp_hider_dict[key]
-                    key = option_keys[int(new_key_index) - 1]
-                    last_name = options[int(new_key_index) - 1]
+                    last_key_id = key_id
+                    tmp_hider_dict = tmp_hider_dict[key_id]
+                    key_id, last_name = options[int(new_key_index) - 1]
                 else:
                     click.secho("输入不合法，请重新输入", fg="red")
 
-            display_urls(options, f"目前有{last_name}书册如下（共{len(options)}项）")
-            urls_to_process = gen_url_from_tags(option_keys)
+            display_urls(option_names, f"目前有{last_name}书册如下（共{len(options)}项）")
+            urls_to_process = gen_url_from_tags([cid for cid, _ in options])
 
         elif choice == "2":
             while True:
@@ -308,7 +306,6 @@ def main(
     list_file: Optional[str],
     output: str,
 ):
-    """智慧教育资源下载工具"""
     # 如果是请求帮助信息，不需要显示欢迎信息
     if any(arg in sys.argv[1:] for arg in ["-h", "--help"]):
         return
