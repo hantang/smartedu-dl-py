@@ -27,6 +27,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 def get_icon_path(filename):
     # 获取当前脚本的目录
     current_dir = Path(__file__).parent
@@ -75,9 +76,10 @@ class BookSelectorFrame(ttk.Frame):
         self.frame_names = ["选择课本", "选择教材"]
         self.level_hiers = []
         self.level_options = []  # 下拉框数据，[id, name]
-        self.wraplength = int(450*scale)
-        self.padx = int(5*scale)
-        self.pady = int(5*scale)
+        self.wraplength = int(450 * scale)
+        self.padx = int(5 * scale)
+        self.pady = int(5 * scale)
+        self.checkbox_height = int(200 * scale)
 
         self.selected_items = set()  # 多选框选中的条目
         self.checkbox_list = []  # 多选框
@@ -119,7 +121,7 @@ class BookSelectorFrame(ttk.Frame):
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
         # 设置最大高度
-        self.checkbox_frame.configure(height=200)  # 设置最大高度
+        self.checkbox_frame.configure(height=self.checkbox_height)  # 设置最大高度
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         # 绑定鼠标滚轮事件
@@ -317,8 +319,9 @@ class InputURLAreaFrame(ttk.Frame):
 
     def __init__(self, parent, scale=1.0):
         super().__init__(parent)
-        self.padx = int(5*scale)
-        self.pady = int(5*scale)
+        self.wraplength = int(500 * scale)
+        self.padx = int(5 * scale)
+        self.pady = int(5 * scale)
         self.setup_ui()
 
     def setup_ui(self):
@@ -359,7 +362,9 @@ class InputURLAreaFrame(ttk.Frame):
             texts += f"{i}. {config['name'][:2]}URL：" + str(config["resources"]["detail"]) + "\n"
 
         help_text = f"支持的URL格式示例：\n{texts}\n可以直接从浏览器地址复制URL。"
-        help_label = ttk.Label(help_frame, text=help_text, wraplength=500, justify=tk.LEFT)
+        help_label = ttk.Label(
+            help_frame, text=help_text, wraplength=self.wraplength, justify=tk.LEFT
+        )
         help_label.pack(fill=tk.X, padx=self.padx, pady=self.pady)
 
     def get_urls(self) -> list:
@@ -379,20 +384,23 @@ class DownloadApp(tk.Tk):
         self.desc_texts = DESCRIBES
         self.icon_dir = get_icon_path(ICON_PATH)
         self.download_dir = DEFAULT_PATH
+
+        self.scale = scale
         width = int(600 * scale)
         height = int(850 * scale)
-        logging.info(f"width = {width}, height={height}")
+        self.wraplength = int(500 * scale)
+        self.padx = int(5 * scale)
+        self.pady = int(5 * scale)
         self.font_size = 12
-        if os_name == 'Windows':
+        if os_name == "Windows":
             self.font_size = int(self.font_size / scale * 1.5)
+        logging.info(f"scale = {scale}, width = {width}, height={height}")
 
+        # 图形大小
         self.title(self.desc_texts[0])
         self.geometry(f"{width}x{height}")
         # self.resizable(False, False)  # Prevent resizing the window
-        self.scale = scale
-        self.wraplength = int(500*scale)
-        self.padx = int(5*scale)
-        self.pady = int(5*scale)
+
         # 设置主题
         # style = ttk.Style()
         # style.theme_use('')
@@ -415,7 +423,10 @@ class DownloadApp(tk.Tk):
         title_frame.pack(fill=tk.X)
 
         ttk.Label(
-            title_frame, text=LOGO_TEXT, font=get_font(["Monaco", "Courier New"], self.font_size, "bold"), anchor='center'
+            title_frame,
+            text=LOGO_TEXT,
+            font=get_font(["Monaco", "Courier New"], self.font_size, "bold"),
+            anchor="center",
         ).pack(fill=tk.BOTH)
         ttk.Label(title_frame, text=self.desc_texts[1]).pack(pady=self.pady * 2)
         ttk.Label(
@@ -598,7 +609,7 @@ def set_dpi_scale():
     if os_name == "Windows":
         ctypes.windll.shcore.SetProcessDpiAwareness(1)
         ScaleFactor = ctypes.windll.shcore.GetScaleFactorForDevice(0)
-        scale = ScaleFactor / 100
+        scale = ScaleFactor / 100.0
     return scale, os_name
 
 
