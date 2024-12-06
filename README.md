@@ -28,6 +28,8 @@ Options:
 ```shell
 # 切换目录
 cd src/
+# 更新依赖
+pip install -r requirements.txt 
 
 # 交互模式，进入后选择：
 # 1. 查询科目列表：展示电子教材（学业阶段）->学科、版本等
