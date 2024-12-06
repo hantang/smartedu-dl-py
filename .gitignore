@@ -171,8 +171,3 @@ back/
 temp/
 todo/
 trash/
-
-# temp
-*.json
-downloads/
-images/
