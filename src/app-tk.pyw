@@ -3,21 +3,16 @@
 """
 
 import logging
-import re
 import sys
 import time
-from pathlib import Path
-
 import tkinter as tk
 import tkinter.font as tkFont
-from tkinter import ttk, messagebox, filedialog
+from tkinter import filedialog, messagebox, ttk
 
-# import sv_ttk
-
-from tools.logo import LOGO_TEXT, DESCRIBES
+from tools.downloader import download_files_tk, fetch_all_data
+from tools.logo import DESCRIBES, LOGO_TEXT
 from tools.parser import extract_resource_url, parse_urls, RESOURCE_DICT
 from tools.parser2 import fetch_metadata, gen_url_from_tags, query_metadata
-from tools.downloader import download_files, download_files_tk, fetch_all_data
 
 DEFAULT_PATH = "./downloads"
 ICON_PATH = "../icons"
@@ -25,7 +20,7 @@ ICON_PATH = "../icons"
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
+    format="%(asctime)s %(filename)s [line:%(lineno)d] %(levelname)s %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)

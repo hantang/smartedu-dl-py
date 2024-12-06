@@ -10,12 +10,12 @@ from typing import Optional, Tuple
 
 import click
 from rich.console import Console
-from rich.progress import Progress
 from rich.progress import BarColumn, SpinnerColumn, TaskProgressColumn, TextColumn
+from rich.progress import Progress
 from rich.table import Table
 
 from tools.downloader import download_files, fetch_all_data
-from tools.logo import LOGO_TEXT2, DESCRIBES
+from tools.logo import DESCRIBES, LOGO_TEXT2
 from tools.parser import extract_resource_url, parse_urls
 from tools.parser2 import fetch_metadata, gen_url_from_tags, query_metadata
 
@@ -25,7 +25,7 @@ DEFAULT_PATH = "./downloads"
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
+    format="%(asctime)s %(filename)s [line:%(lineno)d] %(levelname)s %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)

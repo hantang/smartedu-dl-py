@@ -15,7 +15,6 @@ from concurrent.futures import as_completed, ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
-import m3u8
 import requests
 from tqdm import tqdm
 
@@ -263,6 +262,7 @@ def download_m3u8(url: str, output_path: str = None, max_workers: int = 10) -> d
         base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{url_path}/"
 
         # 解析m3u8文件
+        import m3u8
         m3u8_obj = m3u8.load(url)
         if not m3u8_obj.segments:
             raise ValueError("No segments found in m3u8 file")
