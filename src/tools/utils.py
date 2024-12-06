@@ -1,10 +1,10 @@
 import logging
 import shutil
+import random
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fake_useragent import UserAgent
-
+from .ua import UserAgents
 
 def gen_filename(url, name, save_path, default="output.txt"):
     """确保文件名唯一，如果存在则添加添加(1), (2)等后缀"""
@@ -47,6 +47,7 @@ def clean_dir(temp_dir):
 
 
 def get_headers():
-    ua = UserAgent(platforms=["pc", "desktop"])
-    headers = {"User-Agent": ua.random}
+    # ua = UserAgent(platforms=["pc", "desktop"])
+
+    headers = {"User-Agent": random.choice(UserAgents)}
     return headers
