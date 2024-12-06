@@ -6,7 +6,7 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 import click
 from rich.console import Console
@@ -15,9 +15,12 @@ from rich.progress import BarColumn, SpinnerColumn, TaskProgressColumn, TextColu
 from rich.table import Table
 
 from tools.downloader import download_files, fetch_all_data
-from tools.logo import LOGO_TEXT2
+from tools.logo import LOGO_TEXT2, DESCRIBES
 from tools.parser import extract_resource_url, parse_urls
 from tools.parser2 import fetch_metadata, gen_url_from_tags, query_metadata
+
+DEFAULT_URLS = []
+DEFAULT_PATH = "./downloads"
 
 # 配置日志
 logging.basicConfig(
@@ -27,21 +30,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-DEFAULT_URLS = []
-DEFAULT_PATH = "downloads"
-
-console = Console()
-
 
 def display_welcome():
     """显示欢迎信息"""
     click.clear()
     click.echo(LOGO_TEXT2)
-    click.secho("=== 国家中小学智慧教育平台资源下载 ===", fg="blue", bold=True)
-    click.echo("本工具用于下载智慧教育平台中部分资源文件。主要支持批量下载PDF等资源。\n")
+    click.secho(f"=== {DESCRIBES[0]} ===", fg="blue", bold=True)
+    click.echo(f"> {DESCRIBES[1]}")
+    click.echo(f"> {DESCRIBES[2]}\n")
 
 
-def parse_range(range_str: str, max_num: int, min_num: int = 1) -> List[int]:
+def parse_range(range_str: str, max_num: int, min_num: int = 1) -> list:
     """解析范围表达式，如 "1-3,5,7-9" """
     range_str = range_str.strip().lower()
     if range_str in ["a", "all"]:
@@ -73,14 +72,14 @@ def validate_save_path(path_str: str) -> Tuple[bool, str]:
         return False, str(e)
 
 
-def display_urls(urls: List[str], title: str = "URL列表"):
+def display_urls(urls: list, title: str = "URL列表"):
     """显示URL列表"""
     click.secho(f"\n{title}:", fg="yellow")
     for i, url in enumerate(urls, 1):
         click.echo(f"{i:>2d}. {url}")
 
 
-def display_results(results: List[dict], elapsed_time: float):
+def display_results(console: Console, results: list, elapsed_time: float):
     """展示下载结果统计"""
     # 创建总体统计表格
     summary_table = Table(title="下载统计", show_header=False, title_style="bold magenta")
@@ -162,6 +161,7 @@ def simple_download(urls, save_path, audio):
     # 开始下载
     start_time = time.time()
     click.echo("\n开始下载文件...")
+    console = Console()
 
     # 下载文件
     with Progress(
@@ -177,7 +177,7 @@ def simple_download(urls, save_path, audio):
 
     # 显示统计信息
     elapsed_time = time.time() - start_time
-    display_results(results, elapsed_time)
+    display_results(console, results, elapsed_time)
 
 
 def interactive_download(default_output: str, audio: bool):
@@ -185,7 +185,7 @@ def interactive_download(default_output: str, audio: bool):
     hier_dict, tag_dict, id_dict = None, None, None
     while True:
         click.echo("\n请选择下载模式:")
-        click.echo("1. 查询科目列表")
+        click.echo("1. 查询教材列表")
         click.echo("2. 手动输入URL")
         click.echo("0. 退出")
 
@@ -206,18 +206,18 @@ def interactive_download(default_output: str, audio: bool):
                 continue
 
             # while True:
-            key_id = hier_dict["next"][0]
-            tmp_hider_dict = hier_dict
+            current_opt_id = hier_dict["next"][0]
+            current_hider_dict = hier_dict
             last_name = ""
-            last_tmp_hider_dict = hier_dict
-            last_key_id = key_id
+            last_hider_dict = hier_dict
+            last_opt_id = current_opt_id
             while True:
-                level, name, options = query_metadata(key_id, tmp_hider_dict, tag_dict, id_dict)
+                level, name, options = query_metadata(current_opt_id, current_hider_dict, tag_dict, id_dict)
                 option_names = [op for _, op in options]
                 if len(options) == 0:
                     click.secho(f"当前{last_name}没有候选，请重新选择其他{last_name}", fg="red")
-                    tmp_hider_dict = last_tmp_hider_dict
-                    key_id = last_key_id
+                    current_hider_dict = last_hider_dict
+                    current_opt_id = last_opt_id
                     continue
                 elif level == -1:
                     break
@@ -225,10 +225,10 @@ def interactive_download(default_output: str, audio: bool):
                 display_urls(option_names, f"请选择以下某项{last_name}【{name}】（共{len(options)}项）")
                 new_key_index = click.prompt("请输入", default="1", show_default=True).strip()
                 if new_key_index.isdigit() and 1 <= int(new_key_index) <= len(options):
-                    last_tmp_hider_dict = tmp_hider_dict
-                    last_key_id = key_id
-                    tmp_hider_dict = tmp_hider_dict[key_id]
-                    key_id, last_name = options[int(new_key_index) - 1]
+                    last_hider_dict = current_hider_dict
+                    last_opt_id = current_opt_id
+                    current_hider_dict = current_hider_dict[current_opt_id]
+                    current_opt_id, last_name = options[int(new_key_index) - 1]
                 else:
                     click.secho("输入不合法，请重新输入", fg="red")
 

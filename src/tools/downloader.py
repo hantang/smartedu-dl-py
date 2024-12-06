@@ -75,8 +75,34 @@ def download_files(url_dict: dict, output_dir: str, max_workers: int = 5) -> lis
     return results
 
 
+def download_files_tk(app, url_dict: dict, output_dir: str, max_workers: int = 5, base_progress: int = 0) -> list:
+    """tk下载文件，更新进度条"""
+    save_dir = Path(output_dir)
+    if not save_dir.exists():
+        save_dir.mkdir(parents=True)
+
+    results = []
+    total = len(url_dict)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_url = {
+            executor.submit(download_file2, url, name, save_dir, raw_url): url
+            for url, [name, raw_url] in url_dict.items()
+        }
+        for future in as_completed(future_to_url):
+            # url = future_to_url[future]
+            result = future.result()
+            results.append(result)
+
+            finished = len(results)
+            app.progress_label.config(text=f"已经下载 {finished} / {total} 项资源...")
+            app.progress_var.set(base_progress + (finished / total) * (100-base_progress))
+            app.update()
+
+    return results
+
+
 def fetch_single_data(
-        url: str, headers: dict, timeout: int, data_format: str = "json"
+    url: str, headers: dict, timeout: int, data_format: str = "json"
 ) -> list | dict | str | None:
     # 获取json配置
     response = requests.get(url, timeout=timeout, headers=headers)

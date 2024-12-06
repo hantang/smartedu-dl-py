@@ -2,6 +2,9 @@
 smartedu教材等层级列表解析
 """
 
+import json
+import logging
+from pathlib import Path
 from .downloader import fetch_single_data
 from .parser import RESOURCE_DICT
 from .utils import get_headers
@@ -72,9 +75,7 @@ def _parse_tag_dict(data):
     return out
 
 
-def fetch_metadata():
-    # 生成教材层级结构以及对应书名、ID等
-    name = "/tchMaterial"  # TODO 目前仅教材，待支持课件
+def _fetch_raw(name):
     resources = RESOURCE_DICT[name]["resources"]
     tag_url = resources["tag"]
     version_url = resources["version"]
@@ -82,22 +83,62 @@ def fetch_metadata():
     headers = get_headers()
     timeout = 5
     data_format = "json"
+    parts_data = []
 
     tag_data = fetch_single_data(tag_url, headers, timeout, data_format)
     version_data = fetch_single_data(version_url, headers, timeout, data_format)
     if any([data is None for data in [tag_data, version_data]]):
-        return None, None
+        return None, parts_data
 
     more_urls = version_data.get("urls", [])
     if isinstance(more_urls, str):
         more_urls = more_urls.split(",")
 
-    parts_data = []
     if more_urls:
         for url in more_urls:
             out = fetch_single_data(url, headers, timeout, data_format)
             if out:
                 parts_data.extend(out)
+    return tag_data, parts_data
+
+
+def _fetch_raw_local(name):
+    base = "../data"
+    logging.debug(f"Try load data from local {base}")
+    resources = RESOURCE_DICT[name]["resources"]
+    tag_url = resources["tag"]
+    version_url = resources["version"]
+    tag_file = Path(base, name.strip("/"), tag_url.split("/")[-1])
+    version_file = Path(base, name.strip("/"), version_url.split("/")[-1])
+    parts_data = []
+    if any([not file.exists() for file in [tag_file, version_file]]):
+        return None, parts_data
+
+    tag_data = json.load(open(tag_file))
+    version_data = json.load(open(version_file))
+
+    more_urls = version_data.get("urls", [])
+    if isinstance(more_urls, str):
+        more_urls = more_urls.split(",")
+
+    if more_urls:
+        for url in more_urls:
+            file = Path(base, name.strip("/"), url.split("/")[-1])
+            out = json.load(open(file))
+            logging.debug(f"Read {file}, data={len(out)}")
+            if out:
+                parts_data.extend(out)
+    return tag_data, parts_data
+
+
+def fetch_metadata():
+    # 生成教材层级结构以及对应书名、ID等
+    name = "/tchMaterial"  # TODO 目前仅教材，待支持课件
+    tag_data, parts_data = _fetch_raw(name)
+    if not tag_data:
+        tag_data, parts_data = _fetch_raw_local(name)
+    if not tag_data:
+        return None, None, None
 
     # 专题*/电子教材
     hier_dict = _parse_tag_hiers(tag_data, level=1)
@@ -118,6 +159,10 @@ def fetch_metadata():
             if k2:
                 hier_tags_title[k2] = e["title"]
                 hier_tags_id[k2] = e["id"]  # contentId
+
+    logging.debug(f"hier_tags_title = {len(hier_tags_title)}")
+    logging.debug(f"tag_dict = {len(tag_dict)}")
+    logging.debug(f"hier_tags_id = {len(hier_tags_id)}")
     tag_dict.update(hier_tags_title)
 
     return hier_dict, tag_dict, hier_tags_id

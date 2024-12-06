@@ -1,6 +1,7 @@
 """
 smartedu配置信息和解析
 """
+
 import logging
 import random
 from urllib.parse import parse_qs, urlparse
@@ -61,6 +62,8 @@ RESOURCE_DICT = {
             "national_type": "https://s-file-1.ykt.cbern.com.cn/zxx/ndrs/tags/national_type.json",
             "prepare_type": "https://s-file-1.ykt.cbern.com.cn/zxx/ndrs/tags/prepare_type.json",
             "k12": "https://s-file-1.ykt.cbern.com.cn/zxx/ndrs/tags/k12.json",
+            "detail": "https://basic.smartedu.cn/syncClassroom/classActivity?activityId={activityId}",
+            "detail2": "https://basic.smartedu.cn/syncClassroom/prepare/detail?resourceId={resourceId}",
         },
     },
     "/tchMaterial/detail": {
