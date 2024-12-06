@@ -244,7 +244,7 @@ def _clean_url(resource_url):
 def validate_url(url: str):
     url = url.strip()
     if not url.startswith("http"):
-        return False
+        return None
 
     parse_result = urlparse(url)
     host = parse_result.netloc

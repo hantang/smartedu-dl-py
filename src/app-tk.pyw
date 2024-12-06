@@ -166,7 +166,7 @@ class BookSelectorFrame(ttk.Frame):
             self.update_frame(0)
         else:
             self.update_frame(-1, -1)
-            messagebox.showerror("错误", "获取数据失败，请稍后重试")
+            messagebox.showerror("错误", "获取数据失败，请稍后再试")
 
     def update_frame(self, index):
         """更新层级和课本"""

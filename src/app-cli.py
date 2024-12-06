@@ -16,7 +16,7 @@ from rich.table import Table
 
 from tools.downloader import download_files, fetch_all_data
 from tools.logo import DESCRIBES, LOGO_TEXT2
-from tools.parser import extract_resource_url, parse_urls
+from tools.parser import extract_resource_url, parse_urls, validate_url
 from tools.parser2 import fetch_metadata, gen_url_from_tags, query_metadata
 
 DEFAULT_URLS = []
@@ -45,18 +45,26 @@ def parse_range(range_str: str, max_num: int, min_num: int = 1) -> list:
     range_str = range_str.strip().lower()
     if range_str in ["a", "all"]:
         return list(range(min_num, max_num + 1))
+    if range_str in ["0", ""]:
+        # exit
+        return []
 
     result = set()
     for part in range_str.split(","):
-        if "-" in part:
+        part = part.strip()
+        if "-" in part and not part.startswith("-"):
             start, end = map(str.strip, part.split("-"))
+            if not (start.isdigit() and end.isdigit()):
+                continue
             start, end = int(start), int(end)
             start = max(start, min_num)
             end = min(end, max_num)
             if min_num <= start <= end <= max_num:
                 result.update(range(start, end + 1))
         else:
-            num = int(part.strip())
+            if not part.isdigit():
+                continue
+            num = int(part)
             if min_num <= num <= max_num:
                 result.add(num)
     return sorted(list(result))
@@ -180,21 +188,15 @@ def simple_download(urls, save_path, audio):
     display_results(console, results, elapsed_time)
 
 
-def _interactive_mode1():
-    hier_dict, tag_dict, id_dict = None, None, None
-    if hier_dict is None:
-        click.echo("\n联网查询科目数据中……")
-        hier_dict, tag_dict, id_dict = fetch_metadata()
-    if hier_dict is None:
-        click.secho("获取数据失败，稍后再试", fg="red")
-        return None
-
-    # while True:
+def _interactive_mode1(hier_dict, tag_dict, id_dict, retry=3):
     current_opt_id = hier_dict["next"][0]
     current_hider_dict = hier_dict
     last_name = ""
     last_hider_dict = hier_dict
     last_opt_id = current_opt_id
+    urls_to_process = []
+    options = []
+    level_count = {}
     while True:
         level, name, options = query_metadata(current_opt_id, current_hider_dict, tag_dict, id_dict)
         option_names = [op for _, op in options]
@@ -205,6 +207,10 @@ def _interactive_mode1():
             continue
         elif level == -1:
             break
+        if level not in level_count:
+            level_count[level] = 0
+        else:
+            level_count[level] += 1
 
         display_urls(option_names, f"请选择以下某项{last_name}【{name}】（共{len(options)}项）")
         new_key_index = click.prompt("请输入", default="1", show_default=True).strip()
@@ -214,28 +220,33 @@ def _interactive_mode1():
             current_hider_dict = current_hider_dict[current_opt_id]
             current_opt_id, last_name = options[int(new_key_index) - 1]
         else:
-            click.secho("输入不合法，请重新输入", fg="red")
+            i = level_count[level]
+            options = []
+            click.secho(f"输入不合法，请重新输入（第{i+1}/{retry}次）", fg="red")
+            if i == retry:
+                break
 
-    display_urls(option_names, f"目前有{last_name}书册如下（共{len(options)}项）")
-    urls_to_process = gen_url_from_tags([cid for cid, _ in options])
+    if options:
+        display_urls(option_names, f"目前有{last_name}书册如下（共{len(options)}项）")
+        urls_to_process = gen_url_from_tags([cid for cid, _ in options])
     return urls_to_process
 
 
-def _interactive_mode2():
-    while True:
-        click.echo("\n请输入URL（用逗号分隔）:")
+def _interactive_mode2(retry=3):
+    for i in range(retry):
+        click.echo("\n请输入包含smartedu.cn资源URL（用逗号分隔）:")
         input_urls = click.prompt("").strip()
-        urls_to_process = [url.strip() for url in input_urls.split(",") if url.strip()]
+        urls_to_process = [url.strip() for url in input_urls.split(",") if validate_url(url) ]
         if urls_to_process:
-            display_urls(urls_to_process, "输入的URL列表")
+            display_urls(urls_to_process, "输入的有效URL列表")
             break
-        click.secho("未输入有效URL，请重新输入", fg="red")
+        click.secho(f"未输入有效URL，请重新输入（第{i+1}/{retry}次）", fg="red")
     return urls_to_process
 
 
-def _interactive_filter(urls_to_process):
+def _interactive_filter(urls_to_process, retry=3):
     selected_urls = []
-    while True:
+    for i in range(retry):
         note = "输入序号或者序号范围，如: 1-3,5,7-9"
         click.echo(f"\n请选择要下载的URL（{note}）:")
         range_input = click.prompt("请输入（默认全部）", default="A", show_default=True)
@@ -244,7 +255,7 @@ def _interactive_filter(urls_to_process):
         if selected_indices:
             selected_urls = [urls_to_process[i - 1] for i in selected_indices]
             break
-        click.secho("无效的选择，请重新输入", fg="red")
+        click.secho(f"无效的选择，请重新输入（第{i+1}/{retry}次）", fg="red")
 
     resource_urls = []
     for url in selected_urls:
@@ -253,8 +264,8 @@ def _interactive_filter(urls_to_process):
     return selected_urls
 
 
-def _interactive_path(save_path):
-    while True:
+def _interactive_path(save_path, retry=3):
+    for i in range(retry):
         click.echo(f"\n设置保存路径: （默认路径={save_path}）")
         if click.confirm("是否使用默认路径?", default=True):
             break
@@ -264,33 +275,42 @@ def _interactive_path(save_path):
         if is_valid:
             save_path = validated_path
             break
-        click.secho(f"无效的路径: {save_path}，请重新输入", fg="red")
+        click.secho(f"无效的路径: {save_path}，请重新输入（第{i+1}/{retry}次）", fg="red")
     return save_path
 
 
 def interactive_download(default_output: str, audio: bool):
     """交互式下载流程"""
 
+    hier_dict, tag_dict, id_dict = None, None, None
     while True:
-        click.echo("\n请选择下载模式:")
+        click.echo("\n请选择下载模式（输入数字序号）:")
         click.echo("1. 查询教材列表")
         click.echo("2. 手动输入URL")
-        click.echo("0. 退出")
+        click.echo("0. 退出/exit")
 
-        choice = click.prompt("请选择", type=click.Choice(["1", "2", "0"]), show_choices=False)
+        choice = click.prompt("请选择", type=click.Choice(["1", "2", "0", "exit"]), show_choices=True)
+        choice = choice.strip(" .").lower()
 
-        if choice == "0":
+        if choice in ["0", "exit"]:
             click.echo("\n退出程序")
             sys.exit(0)
 
         # 获取URL列表
         urls_to_process = []
-        if choice == "1":
-            urls_to_process = _interactive_mode1()
 
+        if choice == "1":
+            if hier_dict is None:
+                click.echo("\n联网查询教材数据中……")
+                hier_dict, tag_dict, id_dict = fetch_metadata()
+            if hier_dict is None:
+                click.secho("获取数据失败，请稍后再试", fg="red")
+                continue
+            urls_to_process = _interactive_mode1(hier_dict, tag_dict, id_dict)
         elif choice == "2":
-            urls_to_process = _interactive_mode1()
-        if urls_to_process is None:
+            urls_to_process = _interactive_mode2()
+
+        if not urls_to_process:
             continue
 
         # 确认下载URL
