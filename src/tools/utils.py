@@ -47,6 +47,6 @@ def clean_dir(temp_dir):
 
 
 def get_headers():
-    ua = UserAgent(platforms=["pc"])
+    ua = UserAgent(platforms=["pc", "desktop"])
     headers = {"User-Agent": ua.random}
     return headers

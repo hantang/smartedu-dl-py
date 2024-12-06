@@ -127,7 +127,7 @@ def preprocess(list_file, urls):
                         more_urls = [url.strip() for url in line.split(",") if url.strip()]
                         predefined_urls.extend(more_urls)
         except Exception as e:
-            logger.error(f"读取文件失败: {list_file}", exc_info=True)
+            logger.error(f"读取文件失败: {list_file}, error={e}", exc_info=True)
 
     if urls:
         predefined_urls.extend(url.strip() for url in urls.split(",") if url.strip())
@@ -165,11 +165,11 @@ def simple_download(urls, save_path, audio):
 
     # 下载文件
     with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            console=console,
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
     ) as progress:
         download_task = progress.add_task("正在下载文件...", total=total)
         results = download_files(resource_dict, save_path)
@@ -180,9 +180,97 @@ def simple_download(urls, save_path, audio):
     display_results(console, results, elapsed_time)
 
 
+def _interactive_mode1():
+    hier_dict, tag_dict, id_dict = None, None, None
+    if hier_dict is None:
+        click.echo("\n联网查询科目数据中……")
+        hier_dict, tag_dict, id_dict = fetch_metadata()
+    if hier_dict is None:
+        click.secho("获取数据失败，稍后再试", fg="red")
+        return None
+
+    # while True:
+    current_opt_id = hier_dict["next"][0]
+    current_hider_dict = hier_dict
+    last_name = ""
+    last_hider_dict = hier_dict
+    last_opt_id = current_opt_id
+    while True:
+        level, name, options = query_metadata(current_opt_id, current_hider_dict, tag_dict, id_dict)
+        option_names = [op for _, op in options]
+        if len(options) == 0:
+            click.secho(f"当前{last_name}没有候选，请重新选择其他{last_name}", fg="red")
+            current_hider_dict = last_hider_dict
+            current_opt_id = last_opt_id
+            continue
+        elif level == -1:
+            break
+
+        display_urls(option_names, f"请选择以下某项{last_name}【{name}】（共{len(options)}项）")
+        new_key_index = click.prompt("请输入", default="1", show_default=True).strip()
+        if new_key_index.isdigit() and 1 <= int(new_key_index) <= len(options):
+            last_hider_dict = current_hider_dict
+            last_opt_id = current_opt_id
+            current_hider_dict = current_hider_dict[current_opt_id]
+            current_opt_id, last_name = options[int(new_key_index) - 1]
+        else:
+            click.secho("输入不合法，请重新输入", fg="red")
+
+    display_urls(option_names, f"目前有{last_name}书册如下（共{len(options)}项）")
+    urls_to_process = gen_url_from_tags([cid for cid, _ in options])
+    return urls_to_process
+
+
+def _interactive_mode2():
+    while True:
+        click.echo("\n请输入URL（用逗号分隔）:")
+        input_urls = click.prompt("").strip()
+        urls_to_process = [url.strip() for url in input_urls.split(",") if url.strip()]
+        if urls_to_process:
+            display_urls(urls_to_process, "输入的URL列表")
+            break
+        click.secho("未输入有效URL，请重新输入", fg="red")
+    return urls_to_process
+
+
+def _interactive_filter(urls_to_process):
+    selected_urls = []
+    while True:
+        note = "输入序号或者序号范围，如: 1-3,5,7-9"
+        click.echo(f"\n请选择要下载的URL（{note}）:")
+        range_input = click.prompt("请输入（默认全部）", default="A", show_default=True)
+
+        selected_indices = parse_range(range_input, len(urls_to_process))
+        if selected_indices:
+            selected_urls = [urls_to_process[i - 1] for i in selected_indices]
+            break
+        click.secho("无效的选择，请重新输入", fg="red")
+
+    resource_urls = []
+    for url in selected_urls:
+        if url.startswith("http"):
+            resource_urls.append(url)
+    return selected_urls
+
+
+def _interactive_path(save_path):
+    while True:
+        click.echo(f"\n设置保存路径: （默认路径={save_path}）")
+        if click.confirm("是否使用默认路径?", default=True):
+            break
+
+        save_path = click.prompt("请输入新的保存路径")
+        is_valid, validated_path = validate_save_path(save_path)
+        if is_valid:
+            save_path = validated_path
+            break
+        click.secho(f"无效的路径: {save_path}，请重新输入", fg="red")
+    return save_path
+
+
 def interactive_download(default_output: str, audio: bool):
     """交互式下载流程"""
-    hier_dict, tag_dict, id_dict = None, None, None
+
     while True:
         click.echo("\n请选择下载模式:")
         click.echo("1. 查询教材列表")
@@ -198,88 +286,20 @@ def interactive_download(default_output: str, audio: bool):
         # 获取URL列表
         urls_to_process = []
         if choice == "1":
-            if hier_dict is None:
-                click.echo("\n联网查询科目数据中……")
-                hier_dict, tag_dict, id_dict = fetch_metadata()
-            if hier_dict is None:
-                click.secho("获取数据失败，稍后再试", fg="red")
-                continue
-
-            # while True:
-            current_opt_id = hier_dict["next"][0]
-            current_hider_dict = hier_dict
-            last_name = ""
-            last_hider_dict = hier_dict
-            last_opt_id = current_opt_id
-            while True:
-                level, name, options = query_metadata(current_opt_id, current_hider_dict, tag_dict, id_dict)
-                option_names = [op for _, op in options]
-                if len(options) == 0:
-                    click.secho(f"当前{last_name}没有候选，请重新选择其他{last_name}", fg="red")
-                    current_hider_dict = last_hider_dict
-                    current_opt_id = last_opt_id
-                    continue
-                elif level == -1:
-                    break
-
-                display_urls(option_names, f"请选择以下某项{last_name}【{name}】（共{len(options)}项）")
-                new_key_index = click.prompt("请输入", default="1", show_default=True).strip()
-                if new_key_index.isdigit() and 1 <= int(new_key_index) <= len(options):
-                    last_hider_dict = current_hider_dict
-                    last_opt_id = current_opt_id
-                    current_hider_dict = current_hider_dict[current_opt_id]
-                    current_opt_id, last_name = options[int(new_key_index) - 1]
-                else:
-                    click.secho("输入不合法，请重新输入", fg="red")
-
-            display_urls(option_names, f"目前有{last_name}书册如下（共{len(options)}项）")
-            urls_to_process = gen_url_from_tags([cid for cid, _ in options])
+            urls_to_process = _interactive_mode1()
 
         elif choice == "2":
-            while True:
-                click.echo("\n请输入URL（用逗号分隔）:")
-                input_urls = click.prompt("").strip()
-                urls_to_process = [url.strip() for url in input_urls.split(",") if url.strip()]
-                if urls_to_process:
-                    display_urls(urls_to_process, "输入的URL列表")
-                    break
-                click.secho("未输入有效URL，请重新输入", fg="red")
+            urls_to_process = _interactive_mode1()
+        if urls_to_process is None:
+            continue
 
         # 确认下载URL
-        selected_urls = []
-        while True:
-            note = "输入序号或者序号范围，如: 1-3,5,7-9"
-            click.echo(f"\n请选择要下载的URL（{note}）:")
-            range_input = click.prompt("请输入（默认全部）", default="A", show_default=True)
-
-            selected_indices = parse_range(range_input, len(urls_to_process))
-            if selected_indices:
-                selected_urls = [urls_to_process[i - 1] for i in selected_indices]
-                break
-            click.secho("无效的选择，请重新输入", fg="red")
-
-        resource_urls = []
-        for url in selected_urls:
-            if url.startswith("http"):
-                resource_urls.append(url)
-
+        resource_urls = _interactive_filter(urls_to_process)
         if not resource_urls:
             click.secho("没有找到可下载的合法URL", fg="red")
             continue
-
         # 确认保存路径
-        save_path = default_output
-        while True:
-            click.echo(f"\n设置保存路径: （默认路径={default_output}）")
-            if click.confirm("是否使用默认路径?", default=True):
-                break
-
-            save_path = click.prompt("请输入新的保存路径")
-            is_valid, validated_path = validate_save_path(save_path)
-            if is_valid:
-                save_path = validated_path
-                break
-            click.secho(f"无效的路径: {save_path}，请重新输入", fg="red")
+        save_path = _interactive_path(default_output)
 
         # 开始下载
         simple_download(resource_urls, save_path, audio)
@@ -298,7 +318,14 @@ def interactive_download(default_output: str, audio: bool):
 @click.option("--urls", "-u", help="URL路径列表，用逗号分隔")
 @click.option("--list_file", "-f", type=click.Path(exists=True), help="包含URL的文件")
 @click.option("--output", "-o", type=click.Path(), default=DEFAULT_PATH, help="下载文件保存目录")
-def main(debug: bool, interactive: bool, audio: bool, urls: Optional[str], list_file: Optional[str], output: str):
+def main(
+    debug: bool,
+    interactive: bool,
+    audio: bool,
+    urls: Optional[str],
+    list_file: Optional[str],
+    output: str,
+):
     # 如果是请求帮助信息，不需要显示欢迎信息
     if any(arg in sys.argv[1:] for arg in ["-h", "--help"]):
         return
@@ -322,7 +349,7 @@ def main(debug: bool, interactive: bool, audio: bool, urls: Optional[str], list_
             logger.warning("请使用-u/-f提供URL列表，或使用-i进行交互")
 
     except Exception as e:
-        logger.error("程序执行出错", exc_info=True)
+        logger.error(f"程序执行出错, error={e}", exc_info=True)
         sys.exit(1)
     except KeyboardInterrupt:
         click.echo("\n程序已终止")

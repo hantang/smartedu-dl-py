@@ -7,6 +7,7 @@ import sys
 import time
 import tkinter as tk
 import tkinter.font as tkFont
+from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from tools.downloader import download_files_tk, fetch_all_data
@@ -14,8 +15,9 @@ from tools.logo import DESCRIBES, LOGO_TEXT
 from tools.parser import extract_resource_url, parse_urls, RESOURCE_DICT
 from tools.parser2 import fetch_metadata, gen_url_from_tags, query_metadata
 
+
 DEFAULT_PATH = "./downloads"
-ICON_PATH = "../icons"
+ICON_PATH = "icons"
 
 # 配置日志
 logging.basicConfig(
@@ -24,6 +26,12 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
+
+def get_icon_path(filename):
+    # 获取当前脚本的目录
+    current_dir = Path(__file__).parent
+    # 构建完整路径
+    return Path(current_dir, filename)
 
 
 def display_results(results: list, elapsed_time: float):
@@ -58,7 +66,7 @@ def get_font(families: list, size: int, weight: str = "normal"):
 class BookSelectorFrame(ttk.Frame):
     """自定义选择框架"""
 
-    def __init__(self, parent):
+    def __init__(self, parent, scale=1.0):
         super().__init__(parent)
         # 初始化属性
         self.hier_dict = None
@@ -67,9 +75,9 @@ class BookSelectorFrame(ttk.Frame):
         self.frame_names = ["选择课本", "选择教材"]
         self.level_hiers = []
         self.level_options = []  # 下拉框数据，[id, name]
-        self.wraplength = 450
-        self.padx = 5
-        self.pady = 5
+        self.wraplength = int(450*scale)
+        self.padx = int(5*scale)
+        self.pady = int(5*scale)
 
         self.selected_items = set()  # 多选框选中的条目
         self.checkbox_list = []  # 多选框
@@ -176,12 +184,13 @@ class BookSelectorFrame(ttk.Frame):
         self.create_combobox(0, name, options)
 
     def create_combobox(self, index, name, options):
+        grid_count = 2
         self._destroy_combobox(index + 1)
         self.update_checkbox(None)
 
         # Create a frame for the combobox to control its width
         frame = ttk.Frame(self.combo_frame)
-        frame.grid(row=index // 2, column=index % 2, padx=self.padx, sticky="nsew")
+        frame.grid(row=index // grid_count, column=index % grid_count, padx=self.padx)
         label = ttk.Label(frame, text=f"[{name}]")
         label.pack(fill=tk.X, side=tk.TOP, expand=True)  # 设置水平居中
         option_names = [op[1] for op in options]
@@ -306,10 +315,10 @@ class BookSelectorFrame(ttk.Frame):
 class InputURLAreaFrame(ttk.Frame):
     """手动输入面板"""
 
-    def __init__(self, parent):
+    def __init__(self, parent, scale=1.0):
         super().__init__(parent)
-        self.padx = 5
-        self.pady = 5
+        self.padx = int(5*scale)
+        self.pady = int(5*scale)
         self.setup_ui()
 
     def setup_ui(self):
@@ -363,21 +372,27 @@ class InputURLAreaFrame(ttk.Frame):
 class DownloadApp(tk.Tk):
     """主应用窗口"""
 
-    def __init__(self):
+    def __init__(self, scale=1.0, os_name=None):
         super().__init__()
         self.frame_names = ["books", "inputs"]
         self.frame_titles = ["教材列表", "手动输入"]
         self.desc_texts = DESCRIBES
-        self.icon_dir = ICON_PATH
+        self.icon_dir = get_icon_path(ICON_PATH)
         self.download_dir = DEFAULT_PATH
+        width = int(600 * scale)
+        height = int(850 * scale)
+        logging.info(f"width = {width}, height={height}")
+        self.font_size = 12
+        if os_name == 'Windows':
+            self.font_size = int(self.font_size / scale * 1.5)
 
         self.title(self.desc_texts[0])
-        self.geometry("550x850")
-        self.resizable(False, False)  # Prevent resizing the window
-        self.scale = 1.0
-        self.wraplength = 500
-        self.padx = 5
-        self.pady = 5
+        self.geometry(f"{width}x{height}")
+        # self.resizable(False, False)  # Prevent resizing the window
+        self.scale = scale
+        self.wraplength = int(500*scale)
+        self.padx = int(5*scale)
+        self.pady = int(5*scale)
         # 设置主题
         # style = ttk.Style()
         # style.theme_use('')
@@ -400,14 +415,14 @@ class DownloadApp(tk.Tk):
         title_frame.pack(fill=tk.X)
 
         ttk.Label(
-            title_frame, text=LOGO_TEXT, font=get_font(["Monaco", "Courier New"], 12, "bold")
+            title_frame, text=LOGO_TEXT, font=get_font(["Monaco", "Courier New"], self.font_size, "bold"), anchor='center'
         ).pack(fill=tk.BOTH)
         ttk.Label(title_frame, text=self.desc_texts[1]).pack(pady=self.pady * 2)
         ttk.Label(
             title_frame,
             text=self.desc_texts[2],
             wraplength=self.wraplength,
-            font=get_font(["Kaiti", "STKaiti"], 12, "normal"),
+            font=get_font(["楷体", "Kaiti", "STKaiti"], self.font_size, "normal"),
         ).pack(pady=self.pady)
 
         # 2. 目录+下载按钮
@@ -457,8 +472,8 @@ class DownloadApp(tk.Tk):
         # 4. 内容区域，包括两个面板，单选控制
         self.content_frame = ttk.Frame(main_frame)
         self.content_frame.pack(fill=tk.BOTH, expand=True)
-        self.selector_frame = BookSelectorFrame(self.content_frame)
-        self.inputs_frame = InputURLAreaFrame(self.content_frame)
+        self.selector_frame = BookSelectorFrame(self.content_frame, self.scale)
+        self.inputs_frame = InputURLAreaFrame(self.content_frame, self.scale)
 
         # 默认显示教材列表面板
         self.selector_frame.pack(fill=tk.BOTH, expand=True, pady=self.pady * 2)
@@ -574,8 +589,22 @@ class DownloadApp(tk.Tk):
         return results, elapsed_time
 
 
+def set_dpi_scale():
+    import ctypes
+    import platform
+
+    scale = 1.0
+    os_name = platform.system()
+    if os_name == "Windows":
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        ScaleFactor = ctypes.windll.shcore.GetScaleFactorForDevice(0)
+        scale = ScaleFactor / 100
+    return scale, os_name
+
+
 def main():
-    app = DownloadApp()
+    scale, os_name = set_dpi_scale()
+    app = DownloadApp(scale, os_name)
     app.eval("tk::PlaceWindow . center")
     app.mainloop()
 
