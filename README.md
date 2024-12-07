@@ -57,7 +57,7 @@ python app-tk.pyw
 
 | 界面     | macos                             | windows                           |
 | -------- | --------------------------------- | --------------------------------- |
-| 教材列表 | ![](images/gui-snapshot-mac1.png) | ![](images/gui-snapshot-win1.png) |
+| 教材列表 | ![](images/gui-snapshot-mac1.png) | ![](images/gui-snapshot-win1a.png) |
 | 手动输入 | ![](images/gui-snapshot-mac2.png) | ![](images/gui-snapshot-win2.png) |
 
 ## 依赖
