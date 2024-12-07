@@ -118,8 +118,10 @@ def _fetch_raw_local(name, data_dir):
     if any([not file.exists() for file in [tag_file, version_file]]):
         return None, parts_data
 
-    tag_data = json.load(open(tag_file))
-    version_data = json.load(open(version_file))
+    with open(tag_file, encoding="utf-8") as f:
+        tag_data = json.load(f)
+    with open(version_file, encoding="utf-8") as f:
+        version_data = json.load(f)
 
     more_urls = version_data.get("urls", [])
     if isinstance(more_urls, str):
@@ -128,7 +130,8 @@ def _fetch_raw_local(name, data_dir):
     if more_urls:
         for url in more_urls:
             file = Path(data_dir, name.strip("/"), url.split("/")[-1])
-            out = json.load(open(file))
+            with open(file, encoding="utf-8") as f:
+                out = json.load(f)
             logging.debug(f"Read {file}, data={len(out)}")
             if out:
                 parts_data.extend(out)
