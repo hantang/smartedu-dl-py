@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 from .ua import UserAgents
 
+
 def gen_filename(url, name, save_path, default="output.txt"):
     """确保文件名唯一，如果存在则添加添加(1), (2)等后缀"""
     save_path = Path(save_path)
@@ -51,3 +52,12 @@ def get_headers():
 
     headers = {"User-Agent": random.choice(UserAgents)}
     return headers
+
+
+def get_file_path(base_file, filename):
+    current_dir = Path(base_file).parent
+    logging.debug(f"base = {base_file}\ncurrent_dir={current_dir}")
+
+    out_path = Path(current_dir, filename).resolve()
+    logging.debug(f"file = {filename}\nout={out_path}")
+    return out_path

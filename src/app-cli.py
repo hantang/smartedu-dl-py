@@ -18,8 +18,11 @@ from tools.downloader import download_files, fetch_all_data
 from tools.logo import DESCRIBES, LOGO_TEXT2
 from tools.parser import extract_resource_url, parse_urls, validate_url
 from tools.parser2 import fetch_metadata, gen_url_from_tags, query_metadata
+from tools.utils import get_file_path
+
 
 DEFAULT_URLS = []
+DATA_PATH = "../data"
 DEFAULT_PATH = "./downloads"
 
 # 配置日志
@@ -45,9 +48,6 @@ def parse_range(range_str: str, max_num: int, min_num: int = 1) -> list:
     range_str = range_str.strip().lower()
     if range_str in ["a", "all"]:
         return list(range(min_num, max_num + 1))
-    if range_str in ["0", ""]:
-        # exit
-        return []
 
     result = set()
     for part in range_str.split(","):
@@ -74,10 +74,11 @@ def validate_save_path(path_str: str) -> Tuple[bool, str]:
     """验证保存路径"""
     try:
         path = Path(path_str).resolve()
+        logging.debug(f"mkdir {path}")
         path.mkdir(parents=True, exist_ok=True)
         return True, str(path)
-    except Exception as e:
-        return False, str(e)
+    except Exception:
+        return False, None
 
 
 def display_urls(urls: list, title: str = "URL列表"):
@@ -153,6 +154,7 @@ def simple_download(urls, save_path, audio):
         f"\n共选择 {click.style(str(len(urls)), fg='yellow')} 项目，"
         f"将保存到 {click.style(str(save_path), fg='yellow')} 目录，"
     )
+
     config_urls = parse_urls(urls, audio)
     resource_dict = fetch_all_data(config_urls, _extract_resource_url)
     total = len(resource_dict)
@@ -189,45 +191,66 @@ def simple_download(urls, save_path, audio):
 
 
 def _interactive_mode1(hier_dict, tag_dict, id_dict, retry=3):
-    current_opt_id = hier_dict["next"][0]
-    current_hider_dict = hier_dict
-    last_name = ""
-    last_hider_dict = hier_dict
-    last_opt_id = current_opt_id
-    urls_to_process = []
-    options = []
+    def _query(key):
+        # 查询下一个下拉框数据
+        current_hier_dict = level_hiers[-1]
+        level, name, options = query_metadata(key, current_hier_dict, tag_dict, id_dict)
+        level_records[-1][1] = name
+        return level, name, options
+
+    level_hiers = [hier_dict]
+    level_options = [()]
+    level_records = [(None, ""), [hier_dict["next"][0], ""]]
     level_count = {}
+
+    options = []
+    urls_to_process = []
+
     while True:
-        level, name, options = query_metadata(current_opt_id, current_hider_dict, tag_dict, id_dict)
-        option_names = [op for _, op in options]
+        selected_key = level_records[-1][0]
+        level, name, options = _query(selected_key)
+        option_names = [op[1] for op in options]
+        last_name = level_records[-2][1]
+
         if len(options) == 0:
             click.secho(f"当前{last_name}没有候选，请重新选择其他{last_name}", fg="red")
-            current_hider_dict = last_hider_dict
-            current_opt_id = last_opt_id
+            # 回退到上一级 TODO
             continue
         elif level == -1:
             break
+        last_name2 = f"{last_name}中的" if last_name else ""
+        display_urls(option_names, f"请选择以下{last_name2}某项【{name}】（共{len(options)}项）")
+        selected_index = click.prompt("请输入", default="1", show_default=True).strip().lower()
+
+        if selected_index == "exit":
+            click.secho(f"输入为0，退出当前模式", fg="blue")
+            return []
+
+        # TODO
+        # if selected_index == "0":
+        #     click.secho(f"输入为0，返回上级菜单", fg="blue")
+        #     continue
+
         if level not in level_count:
             level_count[level] = 0
         else:
             level_count[level] += 1
-
-        display_urls(option_names, f"请选择以下某项{last_name}【{name}】（共{len(options)}项）")
-        new_key_index = click.prompt("请输入", default="1", show_default=True).strip()
-        if new_key_index.isdigit() and 1 <= int(new_key_index) <= len(options):
-            last_hider_dict = current_hider_dict
-            last_opt_id = current_opt_id
-            current_hider_dict = current_hider_dict[current_opt_id]
-            current_opt_id, last_name = options[int(new_key_index) - 1]
+        if selected_index.isdigit() and 1 <= int(selected_index) <= len(options):
+            level_hiers.append(level_hiers[-1][selected_key])
+            level_options.append(options)
+            new_selected_key = options[int(selected_index) - 1][0]
+            level_records.append([new_selected_key, ""])
         else:
             i = level_count[level]
-            options = []
             click.secho(f"输入不合法，请重新输入（第{i+1}/{retry}次）", fg="red")
+
+            options = []
             if i == retry:
                 break
 
     if options:
-        display_urls(option_names, f"目前有{last_name}书册如下（共{len(options)}项）")
+        name2 = name if name else "课本"
+        display_urls(option_names, f"目前有{name2}如下（共{len(options)}项）")
         urls_to_process = gen_url_from_tags([cid for cid, _ in options])
     return urls_to_process
 
@@ -236,7 +259,10 @@ def _interactive_mode2(retry=3):
     for i in range(retry):
         click.echo("\n请输入包含smartedu.cn资源URL（用逗号分隔）:")
         input_urls = click.prompt("").strip()
-        urls_to_process = [url.strip() for url in input_urls.split(",") if validate_url(url) ]
+        if input_urls.lower() == "exit":  # 退出
+            return []
+
+        urls_to_process = [url.strip() for url in input_urls.split(",") if validate_url(url)]
         if urls_to_process:
             display_urls(urls_to_process, "输入的有效URL列表")
             break
@@ -289,7 +315,9 @@ def interactive_download(default_output: str, audio: bool):
         click.echo("2. 手动输入URL")
         click.echo("0. 退出/exit")
 
-        choice = click.prompt("请选择", type=click.Choice(["1", "2", "0", "exit"]), show_choices=True)
+        choice = click.prompt(
+            "请选择", type=click.Choice(["1", "2", "0", "exit"]), show_choices=True
+        )
         choice = choice.strip(" .").lower()
 
         if choice in ["0", "exit"]:
@@ -302,7 +330,8 @@ def interactive_download(default_output: str, audio: bool):
         if choice == "1":
             if hier_dict is None:
                 click.echo("\n联网查询教材数据中……")
-                hier_dict, tag_dict, id_dict = fetch_metadata()
+                data_dir = get_file_path(__file__, DATA_PATH)
+                hier_dict, tag_dict, id_dict = fetch_metadata(data_dir)
             if hier_dict is None:
                 click.secho("获取数据失败，请稍后再试", fg="red")
                 continue

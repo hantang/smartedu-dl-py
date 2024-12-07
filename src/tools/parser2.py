@@ -103,14 +103,17 @@ def _fetch_raw(name):
     return tag_data, parts_data
 
 
-def _fetch_raw_local(name):
-    base = "../data"
-    logging.debug(f"Try load data from local {base}")
+def _fetch_raw_local(name, data_dir):
+    logging.debug(f"Try load data from local {data_dir}")
+    if not (data_dir and Path(data_dir).exists()):
+        logging.warning(f"No data dir = {data_dir}")
+        return None, None
+
     resources = RESOURCE_DICT[name]["resources"]
     tag_url = resources["tag"]
     version_url = resources["version"]
-    tag_file = Path(base, name.strip("/"), tag_url.split("/")[-1])
-    version_file = Path(base, name.strip("/"), version_url.split("/")[-1])
+    tag_file = Path(data_dir, name.strip("/"), tag_url.split("/")[-1])
+    version_file = Path(data_dir, name.strip("/"), version_url.split("/")[-1])
     parts_data = []
     if any([not file.exists() for file in [tag_file, version_file]]):
         return None, parts_data
@@ -124,7 +127,7 @@ def _fetch_raw_local(name):
 
     if more_urls:
         for url in more_urls:
-            file = Path(base, name.strip("/"), url.split("/")[-1])
+            file = Path(data_dir, name.strip("/"), url.split("/")[-1])
             out = json.load(open(file))
             logging.debug(f"Read {file}, data={len(out)}")
             if out:
@@ -132,12 +135,15 @@ def _fetch_raw_local(name):
     return tag_data, parts_data
 
 
-def fetch_metadata():
+def fetch_metadata(data_dir=None):
     # 生成教材层级结构以及对应书名、ID等
     name = "/tchMaterial"  # TODO 目前仅教材，待支持课件
+    tag_data = None
+    logging.debug("Fetch online data")
     tag_data, parts_data = _fetch_raw(name)
-    if not tag_data:
-        tag_data, parts_data = _fetch_raw_local(name)
+    if not tag_data and data_dir:
+        logging.debug("Fetch local data")
+        tag_data, parts_data = _fetch_raw_local(name, data_dir)
     if not tag_data:
         return None, None, None
 

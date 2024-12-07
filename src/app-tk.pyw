@@ -14,25 +14,12 @@ from tools.downloader import download_files_tk, fetch_all_data
 from tools.logo import DESCRIBES, LOGO_TEXT
 from tools.parser import extract_resource_url, parse_urls, RESOURCE_DICT
 from tools.parser2 import fetch_metadata, gen_url_from_tags, query_metadata
+from tools.utils import get_file_path
 
 
 DEFAULT_PATH = "./downloads"
 ICON_PATH = "icons"
-
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(filename)s [line:%(lineno)d] %(levelname)s %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
-logger = logging.getLogger(__name__)
-
-
-def get_icon_path(filename):
-    # 获取当前脚本的目录
-    current_dir = Path(__file__).parent
-    # 构建完整路径
-    return Path(current_dir, filename)
+DATA_PATH = "../data"
 
 
 def display_results(results: list, elapsed_time: float):
@@ -157,7 +144,8 @@ class BookSelectorFrame(ttk.Frame):
         # 获取第一级数据
         if self.hier_dict is None:
             self.hierarchy_frame.config(text="联网查询教材数据中……")
-            self.hier_dict, self.tag_dict, self.id_dict = fetch_metadata()
+            data_dir = get_file_path(__file__, DATA_PATH)
+            self.hier_dict, self.tag_dict, self.id_dict = fetch_metadata(data_dir)
 
         if self.hier_dict:
             logging.debug(f"hier_dict = {len(self.hier_dict)}")
@@ -247,6 +235,7 @@ class BookSelectorFrame(ttk.Frame):
         # 示例多选框
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
+
         self.checkbox_list = []
         self.selected_items = set()
         if options is None:
@@ -382,7 +371,7 @@ class DownloadApp(tk.Tk):
         self.frame_names = ["books", "inputs"]
         self.frame_titles = ["教材列表", "手动输入"]
         self.desc_texts = DESCRIBES
-        self.icon_dir = get_icon_path(ICON_PATH)
+        self.icon_dir = get_file_path(__file__, ICON_PATH)
         self.download_dir = DEFAULT_PATH
 
         self.scale = scale
@@ -621,8 +610,12 @@ def main():
 
 
 if __name__ == "__main__":
+    # 配置日志
+    fmt = "%(asctime)s %(filename)s [line:%(lineno)d] %(levelname)s %(message)s"
+    log_level = logging.INFO
     if any(arg in sys.argv[1:] for arg in ["--debug"]):
-        logging.getLogger().setLevel(logging.DEBUG)
-        logger.debug("调试模式已启用")
+        log_level = logging.DEBUG
+    logging.basicConfig(level=log_level, format=fmt)
+    logging.debug("调试模式已启用")
 
     main()
