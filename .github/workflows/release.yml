@@ -23,8 +23,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-        run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
@@ -59,7 +57,7 @@ jobs:
           fi
           mkdir release
           mkdir temp
-          cp -r {src,LICENSE,README.md,requirements.txt} temp/
+          cp -r {src,images,LICENSE,README.md,requirements.txt} temp/
           rm -rf temp/.git
           rm -rf temp/__pycache__
 
