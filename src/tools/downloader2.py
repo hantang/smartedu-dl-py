@@ -1,7 +1,13 @@
 """
 m3u8视频下载，转换成mp4，仍有问题
 # TODO: 合并失败需要处理
-# 依赖：brew install ffmpeg
+
+# python 依赖：
+# m3u8>=3.6.0
+# ffmpeg-python>=0.2.0
+# 其他依赖：
+# $ brew install ffmpeg
+
 # 现成工具：
 # - https://github.com/nilaoda/N_m3u8DL-RE
 # - https://github.com/nilaoda/N_m3u8DL-CLI (only windows)
@@ -16,7 +22,7 @@ from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
 import requests
-from tqdm import tqdm
+# from tqdm import tqdm
 
 from .utils import clean_dir, gen_filename2, get_headers
 
@@ -98,17 +104,17 @@ def download_ts_files(base_url, segments, temp_dir: str, max_workers: int):
             futures.append(executor.submit(download_ts_file2, ts_url, output_ts, headers, timeout))
 
         # 等待所有下载完成并显示进度
-        with tqdm(total=total_segments, desc="下载进度") as pbar:
-            for index, future in enumerate(as_completed(futures)):
-                ts_file = future.result()
-                if ts_file:
-                    downloaded_files.append(ts_file)
-                else:
-                    failed_segments.append((index, segments[index]))
-                pbar.update(1)
-                # 适当休眠，避免请求过快
-                if index % max_workers == 0:
-                    time.sleep(0.5)
+        # with tqdm(total=total_segments, desc="下载进度") as pbar:
+        for index, future in enumerate(as_completed(futures)):
+            ts_file = future.result()
+            if ts_file:
+                downloaded_files.append(ts_file)
+            else:
+                failed_segments.append((index, segments[index]))
+            # pbar.update(1)
+            # 适当休眠，避免请求过快
+            if index % max_workers == 0:
+                time.sleep(0.5)
 
     # 检查是否所有文件都下载成功
     if len(downloaded_files) != total_segments:
@@ -148,22 +154,22 @@ def merge_mp4(temp_dir, downloaded_files, output_path):
 
         # 显示进度
         last_size = 0
-        with tqdm(total=total_size, unit="B", unit_scale=True, desc="合并进度") as pbar:
-            while process.poll() is None:
-                if output_path.exists():
-                    current_size = output_path.stat().st_size
-                    if current_size > last_size:
-                        pbar.update(current_size - last_size)
-                        last_size = current_size
-                time.sleep(0.1)
-
-            # 确保进度条到达100%
+        # with tqdm(total=total_size, unit="B", unit_scale=True, desc="合并进度") as pbar:
+        while process.poll() is None:
             if output_path.exists():
-                final_size = output_path.stat().st_size
-                if final_size > last_size:
-                    pbar.update(final_size - last_size)
+                current_size = output_path.stat().st_size
+                if current_size > last_size:
+                    # pbar.update(current_size - last_size)
+                    last_size = current_size
+            time.sleep(0.1)
 
-        stdout, stderr = process.communicate()
+        # # 确保进度条到达100%
+        # if output_path.exists():
+        #     final_size = output_path.stat().st_size
+        #     if final_size > last_size:
+        #         pbar.update(final_size - last_size)
+
+        # stdout, stderr = process.communicate()
         # if process.returncode != 0:
         #     raise ffmpeg.Error("FFmpeg failed", stderr.decode())
 
@@ -183,15 +189,15 @@ def _merge_ts(downloaded_files, output_path):
     total_size = sum(Path(f).stat().st_size for f in downloaded_files)
 
     with open(output_path, "wb") as outfile:
-        with tqdm(total=total_size, unit="B", unit_scale=True, desc="合并进度") as pbar:
-            for ts_file in downloaded_files:
-                with open(ts_file, "rb") as infile:
-                    while True:
-                        chunk = infile.read(8192)  # 8KB chunks
-                        if not chunk:
-                            break
-                        outfile.write(chunk)
-                        pbar.update(len(chunk))
+        # with tqdm(total=total_size, unit="B", unit_scale=True, desc="合并进度") as pbar:
+        for ts_file in downloaded_files:
+            with open(ts_file, "rb") as infile:
+                while True:
+                    chunk = infile.read(8192)  # 8KB chunks
+                    if not chunk:
+                        break
+                    outfile.write(chunk)
+                    # pbar.update(len(chunk))
 
 
 def m3u8_to_mp4(temp_dir: str, downloaded_files: list, output_path: Path) -> dict:
