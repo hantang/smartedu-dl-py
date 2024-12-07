@@ -29,7 +29,7 @@ Options:
 # 切换目录
 cd src/
 # 更新依赖
-pip install -r requirements.txt 
+pip install -r requirements.txt
 
 # 交互模式，进入后选择：
 # 1. 查询科目列表：展示电子教材（学业阶段）->学科、版本等
@@ -45,7 +45,9 @@ python app-cli.py -u $URL --audio
 python app-cli.py -u $URL -f $FILE
 ```
 
-![](./images/snapshot0.png)
+| macos                            | windows                          |
+| -------------------------------- | -------------------------------- |
+| ![](images/cli-snapshot-mac.png) | ![](images/cli-snapshot-win.png) |
 
 ## 图像界面模式
 
@@ -53,15 +55,14 @@ python app-cli.py -u $URL -f $FILE
 python app-tk.pyw
 ```
 
-- 教材列表
-![](./images/snapshot1.png)
-
-- 手动输入
-![](./images/snapshot2.png)
+| 界面     | macos                             | windows                           |
+| -------- | --------------------------------- | --------------------------------- |
+| 教材列表 | ![](images/gui-snapshot-mac1.png) | ![](images/gui-snapshot-win1.png) |
+| 手动输入 | ![](images/gui-snapshot-mac2.png) | ![](images/gui-snapshot-win2.png) |
 
 ## 依赖
 
-参见: `requirements.txt`文件。其中`click`、`rich`仅在cli版本中使用。
+参见: `requirements.txt`文件。
 
 ## 相关参考
 
