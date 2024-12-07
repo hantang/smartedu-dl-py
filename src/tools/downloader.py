@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Callable
 
 import requests
-from tqdm import tqdm
+# from tqdm import tqdm
 
 from .utils import gen_filename, get_headers
 
@@ -125,29 +125,29 @@ def fetch_all_data(url_list: list, extract_func: Callable, max_workers: int = 5)
     results = {}
     total = len(url_list)
 
-    with tqdm(total=total, desc="获取资源链接") as pbar:
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_url = {
-                executor.submit(fetch_single_data, url, headers, timeout, data_format): url
-                for url in url_list
-            }
+    # with tqdm(total=total, desc="获取资源链接") as pbar:
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_url = {
+            executor.submit(fetch_single_data, url, headers, timeout, data_format): url
+            for url in url_list
+        }
 
-            for future in as_completed(future_to_url):
-                url = future_to_url[future]
-                try:
-                    result = future.result()
-                    if result:
-                        resource = extract_func(result)
-                        for title, resource_url in resource:
-                            if resource_url:
-                                logging.debug(f"title = {title}, resource_url={resource_url}")
-                                results[resource_url] = [title, url]
-                    else:
-                        logging.debug(f"None data URL = {url}")
-                except Exception as e:
-                    logging.error(f"处理URL失败: {url}, 错误: {e}")
-                finally:
-                    pbar.update(1)
-                    # pbar.set_postfix({"找到": len(results)})
+        for future in as_completed(future_to_url):
+            url = future_to_url[future]
+            try:
+                result = future.result()
+                if result:
+                    resource = extract_func(result)
+                    for title, resource_url in resource:
+                        if resource_url:
+                            logging.debug(f"title = {title}, resource_url={resource_url}")
+                            results[resource_url] = [title, url]
+                else:
+                    logging.debug(f"None data URL = {url}")
+            except Exception as e:
+                logging.error(f"处理URL失败: {url}, 错误: {e}")
+            # finally:
+            #     pbar.update(1)
+            #     # pbar.set_postfix({"找到": len(results)})
 
     return results
