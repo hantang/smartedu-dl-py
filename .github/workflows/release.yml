@@ -40,10 +40,10 @@ jobs:
           path: "dist/*.exe"
 
   build-macos:
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        arch: ["x64", "arm64"]
+    runs-on: macos-13
+    # strategy:
+    #   matrix:
+    #     arch: ["x64", "arm64"]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -61,14 +61,14 @@ jobs:
 
       - name: Build app
         run: |
-          pyinstaller --onefile --add-data="src/icons:icons" --icon=icons/favicon.ico --name=mac-${{ matrix.arch }}-${{env.CLI_APP_NAME}} src/app-cli.py
+          pyinstaller --onefile --add-data="src/icons:icons" --icon=icons/favicon.ico --name=mac-${{env.CLI_APP_NAME}} src/app-cli.py
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mac-${{ matrix.arch }}-builds
+          name: mac-builds
           if-no-files-found: error
           retention-days: 7
-          path: "dist/mac-${{ matrix.arch }}-*"
+          path: "dist/mac-*"
 
   build-linux:
     runs-on: ubuntu-latest
@@ -120,7 +120,7 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
           tag_name: ${{ steps.ref.outputs.version }}
           files: |
