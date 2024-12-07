@@ -1,0 +1,82 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build cli app
+        run: |
+          prefix=""
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            prefix="mac-"
+          elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            prefix="linux-"
+          fi
+
+          suffix=""
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            suffix=".exe"
+          fi
+          pyinstaller --onefile --add-data="src/icons:icons" --icon=icons/favicon.ico --name=${prefix}smartedu-dl-cli${suffix} src/app-cli.py
+
+      - name: Build tk app
+        if: 'matrix.os == "windows-latest"'
+        run: |
+          pyinstaller --onefile --windowed  --add-data="src/icons:icons" --icon=icons/favicon.ico --name=smartedu-dl.exe src/app-tk.pyw
+
+      - name: Create release package
+        run: |
+          if [ -d temp ]; then
+            rm -rf temp
+          fi
+          if [ -d release ]; then
+            rm -rf release
+          fi
+          mkdir release
+          mkdir temp
+          cp -r {src,LICENSE,README.md,requirements.txt} temp/
+          rm -rf temp/.git
+          rm -rf temp/__pycache__
+
+          pushd temp
+          zip -r "../release/Source code.zip" .
+          tar -czf "../release/Source code.tar.gz" .
+          popd
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            "release/Source code.zip"
+            "release/Source code.tar.gz"
+            dist/smartedu-dl.exe
+            dist/smartedu-dl-cli.exe
+            dist/mac-smartedu-dl-cli
+            dist/linux-smartedu-dl-cli
+        # env:
+        #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
