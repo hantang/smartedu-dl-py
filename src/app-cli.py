@@ -34,10 +34,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def display_welcome():
+def display_welcome(is_interactive=False):
     """显示欢迎信息"""
-    click.clear()
-    click.echo(LOGO_TEXT2)
+    if is_interactive:
+        click.clear()
+        click.echo(LOGO_TEXT2)
     click.secho(f"=== {DESCRIBES[0]} ===", fg="blue", bold=True)
     click.echo(f"> {DESCRIBES[1]}")
     click.echo(f"> {DESCRIBES[2]}\n")
@@ -140,7 +141,8 @@ def preprocess(list_file, urls):
 
     if urls:
         predefined_urls.extend(url.strip() for url in urls.split(",") if url.strip())
-    return predefined_urls
+    urls = [url for url in predefined_urls if validate_url(url)]
+    return urls
 
 
 def simple_download(urls, save_path, audio):
@@ -383,11 +385,11 @@ def main(
         logging.getLogger().setLevel(logging.DEBUG)
         logger.debug("调试模式已启用")
 
-    display_welcome()
+    mode = (urls or list_file) and (not interactive)
+    display_welcome(not mode)
+
     try:
-        if interactive and (not urls and not list_file):
-            interactive_download(output, audio)
-        elif urls or list_file:
+        if mode:
             # 非交互模式，直接下载预定义URL
             predefined_urls = preprocess(list_file, urls)
             if not predefined_urls:
@@ -395,7 +397,9 @@ def main(
                 sys.exit(1)
             simple_download(predefined_urls, output, audio)
         else:
-            logger.warning("请使用-u/-f提供URL列表，或使用-i进行交互")
+            # 默认改成交互模式
+            interactive_download(output, audio)
+            # logger.warning("请使用-u/-f提供URL列表，或使用-i进行交互")
 
     except Exception as e:
         logger.error(f"程序执行出错, error={e}", exc_info=True)

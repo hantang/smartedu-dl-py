@@ -26,22 +26,26 @@ Options:
 用例：
 
 ```shell
-# 切换目录
-cd src/
 # 更新依赖
 pip install -r requirements.txt
+
+# 切换目录 或者 python app-cli.py
+cd src/
 
 # 交互模式，进入后选择：
 # 1. 查询科目列表：展示电子教材（学业阶段）->学科、版本等
 # 2. 手动输入URL：教材或课件详情页的链接，可逗号分隔。
-python app-cli.py -i
-# SAVEDIR 指定新的默认存储路径
-python app-cli.py -i -o $SAVEDIR
+python app-cli.py
+python app-cli.py -i # -i 参数可选，默认交互模式。
 
-# 命令模式: --audio 表示如果有音频也下载
+# 其他参数：-o 修改默认目录，--audio 表示如果有音频资源也解析并下载
+python app-cli.py -o $SAVEDIR
+python app-cli.py --audio
+
+# 命令模式: 
 # URL: 链接字符串，逗号分隔多个链接
 # FILE: 单个文件名，文件内链接每行一个
-python app-cli.py -u $URL --audio
+python app-cli.py -u $URL 
 python app-cli.py -u $URL -f $FILE
 ```
 
@@ -52,6 +56,7 @@ python app-cli.py -u $URL -f $FILE
 ## 图像界面模式
 
 ```shell
+# 目前仅解析PDF
 python app-tk.pyw
 ```
 
