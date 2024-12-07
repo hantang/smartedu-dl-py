@@ -139,6 +139,24 @@ def display_results(console: Console, results: list, elapsed_time: float):
         console.print(result_table)
 
 
+def display_stats(console: Console, resource_dict: dict):
+    suffix_stats = {}
+    for url, [name, raw_url] in resource_dict.items():
+        suffix = name.split(".")[-1]
+        if suffix not in suffix_stats:
+            suffix_stats[suffix] = 0
+        suffix_stats[suffix] += 1
+    suffix_stats = sorted(suffix_stats.items(), key=lambda x: x[1], reverse=True)
+
+    result_table = Table(title="\n待下载资源", title_style="bold yellow")
+    result_table.add_column("序号", justify="right")
+    result_table.add_column("类型", justify="left")
+    result_table.add_column("数量", justify="right")
+    for i, (suffix, count) in enumerate(suffix_stats, 1):
+        result_table.add_row(str(i), suffix, str(count))
+    console.print(result_table)
+
+
 def preprocess(list_file, urls):
     # 获取预定义URL
     predefined_urls = []
@@ -159,35 +177,33 @@ def preprocess(list_file, urls):
     return urls
 
 
-def simple_download(urls, save_path, audio):
-    def _extract_resource_url(data):
-        suffix_list = ["pdf"]
-        if audio:
-            suffix_list.extend(["mp3"])
-        return extract_resource_url(data, suffix_list)
-
+def simple_download(urls, save_path, formats):
     click.echo(
         f"\n共选择 {click.style(str(len(urls)), fg='yellow')} 项资源，"
         f"将保存到目录【{click.style(str(save_path), fg='yellow')} 】"
     )
 
-    config_urls = parse_urls(urls, audio)
-    resource_dict = fetch_all_data(config_urls, _extract_resource_url)
+    config_urls = parse_urls(urls, formats)
+    resource_dict = fetch_all_data(config_urls, lambda data: extract_resource_url(data, formats))
     total = len(resource_dict)
 
     click.echo(
-        f"\n共输入URL {click.style(str(len(urls)), fg='yellow')} 个，"
-        f"解析得到配置链接共 {click.style(str(len(config_urls)), fg='yellow')} 个，"
-        f"其中有效资源文件共 {click.style(str(total), fg='yellow')} 个"
+        f"\n输入的有效链接共 {click.style(str(len(urls)), fg='yellow')} 个；"
+        f"\n解析得配置链接共 {click.style(str(len(config_urls)), fg='yellow')} 个；"
+        f"\n最终的资源文件共 {click.style(str(total), fg='yellow')} 个。"
     )
+    for u in config_urls:
+        logging.info(u)
     if total == 0:
         click.echo("\n没有找到资源文件（PDF/MP3等）。结束下载")
         return
 
+    console = Console()
+    display_stats(console, resource_dict)
+
     # 开始下载
     start_time = time.time()
     click.echo("\n开始下载文件...")
-    console = Console()
 
     # 下载文件
     with Progress(
@@ -226,10 +242,11 @@ def _interactive_mode1(hier_dict, tag_dict, id_dict, retry=3):
         level, name, options = _query(selected_key)
 
         if len(options) == 0:
-            click.secho(f"\n当前选择的【{last_name}】为“{selected_option}”没有候选，请重选", fg="red")
+            note = f"【{last_name}】为“{selected_option}”"
+            click.secho(f"\n当前选择的{note}没有候选，请重选", fg="red")
             count = 0
             # 只有单一选项且候选为空都返回
-            while len(level_options) > 1 and len(level_options[-1]) == 1:
+            while len(level_options) > 1 and len(level_options[-1]) <= 1:
                 count += 1
                 for v in [level_hiers, level_options, level_records]:
                     v.pop()
@@ -399,14 +416,14 @@ def interactive_download(default_output: str, audio: bool):
 @click.help_option("-h", "--help")
 @click.option("--debug", "-d", is_flag=True, help="启用调试模式")
 @click.option("--interactive", "-i", is_flag=True, help="交互模式（默认）")
-@click.option("--audio", "-a", is_flag=True, help="下载音频文件（如果有）")
-@click.option("--urls", "-u", help="URL路径列表，用逗号分隔")
+@click.option("--formats", "-t", help="下载资源类型，逗号分隔")
+@click.option("--urls", "-u", help="URL路径列表，逗号分隔")
 @click.option("--list_file", "-f", type=click.Path(exists=True), help="包含URL的文件")
 @click.option("--output", "-o", type=click.Path(), default=DEFAULT_PATH, help="下载文件保存目录")
 def main(
     debug: bool,
     interactive: bool,
-    audio: bool,
+    formats: Optional[str],
     urls: Optional[str],
     list_file: Optional[str],
     output: str,
@@ -421,6 +438,11 @@ def main(
 
     mode = (urls or list_file) and (not interactive)
     display_welcome(not mode)
+    if formats:
+        formats = formats.split(",")
+    else:
+        formats = ["pdf"]
+    logging.debug(f"formats = {formats}")
 
     try:
         if mode:
@@ -429,10 +451,10 @@ def main(
             if not predefined_urls:
                 logger.error("没有提供有效的URL")
                 sys.exit(1)
-            simple_download(predefined_urls, output, audio)
+            simple_download(predefined_urls, output, formats)
         else:
             # 默认改成交互模式
-            interactive_download(output, audio)
+            interactive_download(output, formats)
             # logger.warning("请使用-u/-f提供URL列表，或使用-i进行交互")
 
     except Exception as e:

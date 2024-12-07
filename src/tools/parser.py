@@ -22,7 +22,7 @@ SERVER_LIST2 = [
 RESOURCE_TYPE_DICT = {
     "assets_document": ["文档", ["pdf", "jpg", "superboard"]],
     "assets_audio": ["音频", ["mp3", "ogg"]],
-    "assets_video": ["视频", ["m3u8"]],
+    "assets_video": ["视频", ["m3u8", "mp4"]],
 }
 
 TI_FORMATS = [
@@ -34,6 +34,8 @@ TI_FORMATS = [
     ["pdf", "application/pdf"],
     ["superboard", "superboard"],
 ]
+
+ACCEPTED_FORMATS = [t for k, v in RESOURCE_TYPE_DICT.items() if k != "assets_video" for t in v[1]]
 
 DOMAIN_REMAP_DICT = {
     "web-bd.ykt.eduyun.cn": "basic.smartedu.cn",
@@ -259,11 +261,17 @@ def validate_url(url: str):
     return parse_result
 
 
-def parse_urls(urls: list, audio: bool = False) -> list:
+def parse_urls(urls: list, formats: list) -> list:
     # 根据URL路径判断资源类型，获得临时的配置信息URL(config, 返回json数据)，再解析得到最终资源URL
     config_urls = []
     config_key = "default"
     config_key2 = "audio"
+    audio = False
+    for v in formats:
+        if v.strip().lower() in RESOURCE_TYPE_DICT["assets_audio"][1]:
+            audio = True
+            break
+
     for url in set(urls):
         parse_result = validate_url(url)
         if parse_result is None:
@@ -313,7 +321,7 @@ def _extract_resource(data, suffix="pdf"):
         title = entry.get("title", f"{suffix.upper()}-{i:02d}")
         resource_url = None
         for item in entry["ti_items"]:
-            if item["ti_format"] == suffix and item["ti_storages"]:
+            if item["ti_format"].lower().strip() == suffix and item["ti_storages"]:
                 resource_url = random.choice(item["ti_storages"])
                 resource_url = _clean_url(resource_url)
                 break
@@ -324,10 +332,12 @@ def _extract_resource(data, suffix="pdf"):
 
 
 def extract_resource_url(data: dict | list, suffix_list: list) -> list:
-    # TODO "pdf", "mp3", "ogg", "m3u8"
     logging.debug(f"extract suffix = {suffix_list}")
     out = []
     for suffix in suffix_list:
+        suffix = suffix.strip().lower()
+        if suffix not in ACCEPTED_FORMATS:
+            continue
         result = _extract_resource(data, suffix)
         out.extend(result)
         logging.debug(f"result = {result}")
