@@ -1,5 +1,8 @@
 # smartedu-dl
 
+![build](https://github.com/hantang/smartedu-dl/actions/workflows/release.yml/badge.svg)
+![GitHub Tag](https://img.shields.io/github/v/tag/hantang/smartedu-dl)
+
 > 智慧教育平台资源下载工具
 
 ## 功能说明
@@ -29,7 +32,7 @@ Options:
 # 更新依赖
 pip install -r requirements.txt
 
-# 切换目录 或者 python app-cli.py
+# 切换目录 或者 python src/app-cli.py
 cd src/
 
 # 交互模式，进入后选择：
@@ -42,10 +45,10 @@ python app-cli.py -i # -i 参数可选，默认交互模式。
 python app-cli.py -o $SAVEDIR
 python app-cli.py --audio
 
-# 命令模式: 
+# 命令模式:
 # URL: 链接字符串，逗号分隔多个链接
 # FILE: 单个文件名，文件内链接每行一个
-python app-cli.py -u $URL 
+python app-cli.py -u $URL
 python app-cli.py -u $URL -f $FILE
 ```
 
@@ -60,10 +63,10 @@ python app-cli.py -u $URL -f $FILE
 python app-tk.pyw
 ```
 
-| 界面     | macos                             | windows                           |
-| -------- | --------------------------------- | --------------------------------- |
+| 界面     | macos                             | windows                            |
+| -------- | --------------------------------- | ---------------------------------- |
 | 教材列表 | ![](images/gui-snapshot-mac1.png) | ![](images/gui-snapshot-win1a.png) |
-| 手动输入 | ![](images/gui-snapshot-mac2.png) | ![](images/gui-snapshot-win2.png) |
+| 手动输入 | ![](images/gui-snapshot-mac2.png) | ![](images/gui-snapshot-win2.png)  |
 
 ## 依赖
 
@@ -73,3 +76,4 @@ python app-tk.pyw
 
 - [happycola233/tchMaterial-parser](https://github.com/happycola233/tchMaterial-parser)
 - [52beijixing/smartedu-download](https://github.com/52beijixing/smartedu-download)
+- 图标来自：<https://www.smartedu.cn/>
