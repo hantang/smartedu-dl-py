@@ -43,9 +43,11 @@ jobs:
           pyinstaller --onefile --add-data="src/icons:icons" --icon=icons/favicon.ico --name=${prefix}smartedu-dl-cli${suffix} src/app-cli.py
 
       - name: Build tk app
-        if: 'matrix.os == "windows-latest"'
+        # if: 'matrix.os == "windows-latest"'
         run: |
-          pyinstaller --onefile --windowed  --add-data="src/icons:icons" --icon=icons/favicon.ico --name=smartedu-dl.exe src/app-tk.pyw
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            pyinstaller --onefile --windowed --add-data="src/icons:icons" --icon=icons/favicon.ico --name=smartedu-dl.exe src/app-tk.pyw
+          fi
 
       - name: Create release package
         run: |
