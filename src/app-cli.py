@@ -24,6 +24,10 @@ from tools.utils import get_file_path
 DEFAULT_URLS = []
 DATA_PATH = "../data"
 DEFAULT_PATH = "./downloads"
+EXIT_KEY = "exit"
+ZERO_KEY = "0"
+FIRST_KEY = "1"
+ALL_KEY = "a"
 
 # 配置日志
 logging.basicConfig(
@@ -82,35 +86,45 @@ def validate_save_path(path_str: str) -> Tuple[bool, str]:
         return False, None
 
 
-def display_urls(urls: list, title: str = "URL列表"):
+def display_entries(data: list, title: str = "URL列表", title2: str = None):
     """显示URL列表"""
-    click.secho(f"\n{title}:", fg="yellow")
-    for i, url in enumerate(urls, 1):
-        click.echo(f"{i:>2d}. {url}")
+    width = len(str(len(data)))
+    if title2:
+        click.secho(f"\n{title}：", bold=True)
+        click.secho(" " * (width + 2) + f"【{title2}】", fg="yellow")
+    else:
+        click.secho(f"\n{title}：", fg="yellow")
+
+    for i, value in enumerate(data, 1):
+        if isinstance(value, str):
+            click.echo(f"{click.style(f'[{i:>{width}d}]', bold=True, fg='blue')} {value}")
+        else:
+            v1, v2 = value
+            click.echo(f"{click.style(f'[{v1}]', bold=True, fg='blue')} {v2}")
 
 
 def display_results(console: Console, results: list, elapsed_time: float):
     """展示下载结果统计"""
     # 创建总体统计表格
-    summary_table = Table(title="下载统计", show_header=False, title_style="bold magenta")
+    summary_table = Table(title="下载统计", show_header=False, title_style="bold yellow")
     success_count = sum(1 for r in results if r["status"] == "success")
     failed_count = len(results) - success_count
 
     summary_table.add_row("总计文件", str(len(results)))
     summary_table.add_row("成功下载", f"[green]{success_count}[/green]")
     summary_table.add_row("下载失败", f"[red]{failed_count}[/red]")
-    summary_table.add_row("总用时", f"{elapsed_time:.1f}秒")
+    summary_table.add_row("总计用时", f"{elapsed_time:.2f}秒")
 
     console.print("\n")
     console.print(summary_table)
 
     # 创建详细结果表格
     if results:
-        result_table = Table(title="\n下载详情", title_style="bold magenta")
+        result_table = Table(title="\n下载详情", title_style="bold yellow")
         result_table.add_column("序号", justify="right")
         result_table.add_column("URL", justify="left", no_wrap=False)
         result_table.add_column("状态", justify="center")
-        result_table.add_column("保存路径", justify="left", no_wrap=False)
+        result_table.add_column("存储", justify="left", no_wrap=False)
 
         for i, res in enumerate(results, 1):
             # status_style = "green" if res["status"] == "success" else "red"
@@ -153,8 +167,8 @@ def simple_download(urls, save_path, audio):
         return extract_resource_url(data, suffix_list)
 
     click.echo(
-        f"\n共选择 {click.style(str(len(urls)), fg='yellow')} 项目，"
-        f"将保存到 {click.style(str(save_path), fg='yellow')} 目录，"
+        f"\n共选择 {click.style(str(len(urls)), fg='yellow')} 项资源，"
+        f"将保存到目录【{click.style(str(save_path), fg='yellow')} 】"
     )
 
     config_urls = parse_urls(urls, audio)
@@ -163,8 +177,8 @@ def simple_download(urls, save_path, audio):
 
     click.echo(
         f"\n共输入URL {click.style(str(len(urls)), fg='yellow')} 个，"
-        f"解析得到配置 {click.style(str(len(config_urls)), fg='yellow')} 个，"
-        f"有效的资源文件共 {click.style(str(total), fg='yellow')} 个"
+        f"解析得到配置链接共 {click.style(str(len(config_urls)), fg='yellow')} 个，"
+        f"其中有效资源文件共 {click.style(str(total), fg='yellow')} 个"
     )
     if total == 0:
         click.echo("\n没有找到资源文件（PDF/MP3等）。结束下载")
@@ -197,76 +211,92 @@ def _interactive_mode1(hier_dict, tag_dict, id_dict, retry=3):
         # 查询下一个下拉框数据
         current_hier_dict = level_hiers[-1]
         level, name, options = query_metadata(key, current_hier_dict, tag_dict, id_dict)
-        level_records[-1][1] = name
+        level_records[-1][2] = name
         return level, name, options
 
     level_hiers = [hier_dict]
     level_options = [()]
-    level_records = [(None, ""), [hier_dict["next"][0], ""]]
-    level_count = {}
-
+    level_records = [[hier_dict["next"][0], "", ""]]  # (key, option, name)
     options = []
     urls_to_process = []
-
-    while True:
-        selected_key = level_records[-1][0]
+    flag = True
+    while flag:
+        last_name = level_records[-2][2] if len(level_records) > 1 else ""
+        selected_key, selected_option = level_records[-1][:2]
         level, name, options = _query(selected_key)
-        option_names = [op[1] for op in options]
-        last_name = level_records[-2][1]
 
         if len(options) == 0:
-            click.secho(f"当前{last_name}没有候选，请重新选择其他{last_name}", fg="red")
-            # 回退到上一级 TODO
+            click.secho(f"\n当前选择的【{last_name}】为“{selected_option}”没有候选，请重选", fg="red")
+            count = 0
+            # 只有单一选项且候选为空都返回
+            while len(level_options) > 1 and len(level_options[-1]) == 1:
+                count += 1
+                for v in [level_hiers, level_options, level_records]:
+                    v.pop()
+            if len(level_options) > 1:
+                count += 1
+                for v in [level_hiers, level_options, level_records]:
+                    v.pop()
+
+            click.echo(f"将回退{count}级到【{level_records[-1][2]}】")
             continue
         elif level == -1:
             break
-        last_name2 = f"{last_name}中的" if last_name else ""
-        display_urls(option_names, f"请选择以下{last_name2}某项【{name}】（共{len(options)}项）")
-        selected_index = click.prompt("请输入", default="1", show_default=True).strip().lower()
 
-        if selected_index == "exit":
-            click.secho(f"输入为0，退出当前模式", fg="blue")
-            return []
+        step = len(level_options)
+        note = "，输入0返回上一级" if step > 1 else ""
+        note_title = f"{step}. 请选择以下{last_name}某项（共{len(options)}项{note}）"
+        option_names = [op[1] for op in options]
+        for i in range(retry):
+            display_entries(option_names, note_title, name)
+            selected_index = click.prompt("请选择", default=FIRST_KEY, show_default=True)
+            selected_index = selected_index.strip().lower()
 
-        # TODO
-        # if selected_index == "0":
-        #     click.secho(f"输入为0，返回上级菜单", fg="blue")
-        #     continue
+            if selected_index == EXIT_KEY:
+                click.secho(f"输入为「{EXIT_KEY}」，退出当前模式", fg="red")
+                return []
 
-        if level not in level_count:
-            level_count[level] = 0
-        else:
-            level_count[level] += 1
-        if selected_index.isdigit() and 1 <= int(selected_index) <= len(options):
-            level_hiers.append(level_hiers[-1][selected_key])
-            level_options.append(options)
-            new_selected_key = options[int(selected_index) - 1][0]
-            level_records.append([new_selected_key, ""])
-        else:
-            i = level_count[level]
-            click.secho(f"输入不合法，请重新输入（第{i+1}/{retry}次）", fg="red")
-
-            options = []
-            if i == retry:
+            if step > 1 and selected_index == ZERO_KEY:
+                click.secho(f"输入为「{ZERO_KEY}」，返回上级菜单", fg="blue")
+                for v in [level_hiers, level_options, level_records]:
+                    v.pop()
                 break
+
+            if selected_index.isdigit() and 1 <= int(selected_index) <= len(options):
+                # 更新到下一级
+                level_hiers.append(level_hiers[-1][selected_key])
+                level_options.append(options)
+                level_records.append(options[int(selected_index) - 1] + [""])
+                break
+            else:
+                click.secho(f"输入不合法，请重新输入（第{i+1}/{retry}次）", fg="red")
+        else:
+            logging.debug("错误次数过多，重置")
+            options = []
+            flag = False
 
     if options:
         name2 = name if name else "课本"
-        display_urls(option_names, f"目前有{name2}如下（共{len(options)}项）")
+        selected_option = level_records[-1][1]
+        option_names = [op[1] for op in options]
+        note_title = f"当前选择的【{selected_option}】共{len(options)}项，如下"
+        display_entries(option_names, note_title, name2)
         urls_to_process = gen_url_from_tags([cid for cid, _ in options])
     return urls_to_process
 
 
 def _interactive_mode2(retry=3):
     for i in range(retry):
-        click.echo("\n请输入包含smartedu.cn资源URL（用逗号分隔）:")
-        input_urls = click.prompt("").strip()
-        if input_urls.lower() == "exit":  # 退出
+        note = click.style("「smartedu.cn」", fg="blue", bold=True)
+        click.echo(f"\n请输入包含{note}资源的URL（逗号分隔）：")
+        input_urls = click.prompt("")
+        input_urls = input_urls.strip().lower()
+        if input_urls == EXIT_KEY:  # 退出
             return []
 
         urls_to_process = [url.strip() for url in input_urls.split(",") if validate_url(url)]
         if urls_to_process:
-            display_urls(urls_to_process, "输入的有效URL列表")
+            display_entries(urls_to_process, "已输入列表", "有效URL")
             break
         click.secho(f"未输入有效URL，请重新输入（第{i+1}/{retry}次）", fg="red")
     return urls_to_process
@@ -275,9 +305,12 @@ def _interactive_mode2(retry=3):
 def _interactive_filter(urls_to_process, retry=3):
     selected_urls = []
     for i in range(retry):
-        note = "输入序号或者序号范围，如: 1-3,5,7-9"
-        click.echo(f"\n请选择要下载的URL（{note}）:")
-        range_input = click.prompt("请输入（默认全部）", default="A", show_default=True)
+        note = "（输入序号或者序号范围，如: 1-3,5,7-9；默认全部）"
+        click.echo(f"\n请选择以上候选中需下载项：\n{note}")
+        range_input = click.prompt("请输入", default=ALL_KEY.upper(), show_default=True)
+        if range_input == EXIT_KEY:
+            click.secho(f"输入为「{EXIT_KEY}」，退出当前模式", fg="red")
+            return []
 
         selected_indices = parse_range(range_input, len(urls_to_process))
         if selected_indices:
@@ -303,7 +336,7 @@ def _interactive_path(save_path, retry=3):
         if is_valid:
             save_path = validated_path
             break
-        click.secho(f"无效的路径: {save_path}，请重新输入（第{i+1}/{retry}次）", fg="red")
+        click.secho(f"无效的路径：【{save_path}】，请重新输入（第{i+1}/{retry}次）", fg="red")
     return save_path
 
 
@@ -311,25 +344,26 @@ def interactive_download(default_output: str, audio: bool):
     """交互式下载流程"""
 
     hier_dict, tag_dict, id_dict = None, None, None
+    mode_options = [
+        ["1", "查询教材列表"],
+        ["2", "手动输入URL"],
+        [ZERO_KEY, f"退出（或{EXIT_KEY}）"],
+    ]
     while True:
-        click.echo("\n请选择下载模式（输入数字序号）:")
-        click.echo("1. 查询教材列表")
-        click.echo("2. 手动输入URL")
-        click.echo("0. 退出/exit")
+        note_title = "请选择下载模式（输入数字序号）"
+        display_entries(mode_options, note_title)
 
-        choice = click.prompt(
-            "请选择", type=click.Choice(["1", "2", "0", "exit"]), show_choices=True
-        )
-        choice = choice.strip(" .").lower()
+        choice_values = [idx for idx, _ in mode_options] + [EXIT_KEY]
+        choice = click.prompt("请选择", type=click.Choice(choice_values), show_choices=True)
+        choice = choice.strip().lower()
 
-        if choice in ["0", "exit"]:
+        if choice in choice_values[2:]:
             click.echo("\n退出程序")
             sys.exit(0)
 
         # 获取URL列表
         urls_to_process = []
-
-        if choice == "1":
+        if choice == choice_values[0]:
             if hier_dict is None:
                 click.echo("\n联网查询教材数据中……")
                 data_dir = get_file_path(__file__, DATA_PATH)
@@ -338,7 +372,7 @@ def interactive_download(default_output: str, audio: bool):
                 click.secho("获取数据失败，请稍后再试", fg="red")
                 continue
             urls_to_process = _interactive_mode1(hier_dict, tag_dict, id_dict)
-        elif choice == "2":
+        elif choice == choice_values[1]:
             urls_to_process = _interactive_mode2()
 
         if not urls_to_process:
@@ -347,7 +381,7 @@ def interactive_download(default_output: str, audio: bool):
         # 确认下载URL
         resource_urls = _interactive_filter(urls_to_process)
         if not resource_urls:
-            click.secho("没有找到可下载的合法URL", fg="red")
+            click.secho("没有找到可下载的有效URL", fg="red")
             continue
         # 确认保存路径
         save_path = _interactive_path(default_output)
@@ -356,7 +390,7 @@ def interactive_download(default_output: str, audio: bool):
         simple_download(resource_urls, save_path, audio)
 
         # 询问是否继续
-        if not click.confirm("\n是否继续下载?", default=True):
+        if not click.confirm("\n是否继续下载?", default=True, show_default=True):
             click.echo("\n结束下载")
             break
 
@@ -364,7 +398,7 @@ def interactive_download(default_output: str, audio: bool):
 @click.command()
 @click.help_option("-h", "--help")
 @click.option("--debug", "-d", is_flag=True, help="启用调试模式")
-@click.option("--interactive", "-i", is_flag=True, help="交互模式")
+@click.option("--interactive", "-i", is_flag=True, help="交互模式（默认）")
 @click.option("--audio", "-a", is_flag=True, help="下载音频文件（如果有）")
 @click.option("--urls", "-u", help="URL路径列表，用逗号分隔")
 @click.option("--list_file", "-f", type=click.Path(exists=True), help="包含URL的文件")
