@@ -34,13 +34,16 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          # name:
+          name: windows-x64-builds
           if-no-files-found: error
           retention-days: 7
           path: "dist/*.exe"
 
   build-macos:
     runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: ["x64", "arm64"]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -58,14 +61,14 @@ jobs:
 
       - name: Build app
         run: |
-          pyinstaller --onefile --add-data="src/icons:icons" --icon=icons/favicon.ico --name=mac-${{env.CLI_APP_NAME}} src/app-cli.py
+          pyinstaller --onefile --add-data="src/icons:icons" --icon=icons/favicon.ico --name=mac-${{ matrix.arch }}-${{env.CLI_APP_NAME}} src/app-cli.py
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          # name:
+          name: mac-${{ matrix.arch }}-builds
           if-no-files-found: error
           retention-days: 7
-          path: "dist/mac-*"
+          path: "dist/mac-${{ matrix.arch }}-*"
 
   build-linux:
     runs-on: ubuntu-latest
@@ -90,7 +93,7 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          # name:
+          name: linux-x64-builds
           if-no-files-found: error
           retention-days: 7
           path: "dist/linux-*"
