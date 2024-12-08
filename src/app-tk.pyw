@@ -16,10 +16,10 @@ from tools.parser import extract_resource_url, parse_urls, RESOURCE_DICT
 from tools.parser2 import fetch_metadata, gen_url_from_tags, query_metadata
 from tools.utils import get_file_path
 
-
-DEFAULT_PATH = "./downloads"
 ICON_PATH = "icons"
 DATA_PATH = "../data"
+RESOURCE_FORMATS = ["pdf", "mp3", "ogg", "jpg", "m3u8", "superboard"]
+RESOURCE_NAMES = ["文档", "音频", "音频", "图片", "视频", "白板"]
 
 
 def display_results(results: list, elapsed_time: float):
@@ -372,7 +372,7 @@ class DownloadApp(tk.Tk):
         self.frame_titles = ["教材列表", "手动输入"]
         self.desc_texts = DESCRIBES
         self.icon_dir = get_file_path(__file__, ICON_PATH)
-        self.download_dir = DEFAULT_PATH
+        self.download_dir = Path.home() / "Downloads"  # 改为用户目录
 
         self.scale = scale
         width = int(600 * scale)
@@ -425,6 +425,66 @@ class DownloadApp(tk.Tk):
             font=get_font(["楷体", "Kaiti", "STKaiti"], self.font_size, "normal"),
         ).pack(pady=self.pady)
 
+        self.setup_mode_frame(main_frame)
+        self.setup_control_frame(main_frame)
+
+    def setup_mode_frame(self, main_frame):
+        # 3. 模式选择：两个单选按钮
+        self.mode_var = tk.StringVar(value=self.frame_names[0])
+        mode_frame = ttk.Frame(main_frame)
+        mode_frame.pack(fill=tk.BOTH, expand=True, pady=self.pady)
+
+        radio1 = ttk.Radiobutton(
+            mode_frame,
+            text=self.frame_titles[0],
+            value=self.frame_names[0],
+            variable=self.mode_var,
+            command=self.switch_mode,
+        )
+
+        radio2 = ttk.Radiobutton(
+            mode_frame,
+            text=self.frame_titles[1],
+            value=self.frame_names[1],
+            variable=self.mode_var,
+            command=self.switch_mode,
+        )
+        radio1.pack(side=tk.LEFT, fill=tk.X, padx=self.padx*2)
+        radio2.pack(side=tk.LEFT, fill=tk.X, padx=self.padx*2)
+
+        # 4. 内容区域，包括两个面板，单选控制
+        self.content_frame = ttk.Frame(main_frame)
+        self.content_frame.pack(fill=tk.BOTH, expand=True)
+        self.selector_frame = BookSelectorFrame(self.content_frame, self.scale)
+        self.inputs_frame = InputURLAreaFrame(self.content_frame, self.scale)
+
+        # 默认显示教材列表面板
+        self.selector_frame.pack(fill=tk.BOTH, expand=True, pady=self.pady * 2)
+
+    def setup_control_frame(self, main_frame):
+        # New: 资源类型选项
+        formats_frame = ttk.Frame(main_frame)
+        formats_frame.pack(fill=tk.X, pady=self.pady)
+        ttk.Label(formats_frame, text="资源类型").pack(side=tk.LEFT)
+
+        self.formats_vars = {}
+        for name, suffix in zip(RESOURCE_NAMES, RESOURCE_FORMATS):
+            var = tk.BooleanVar()
+            self.formats_vars[suffix] = var
+            value, state = False, "enable"
+            if suffix == RESOURCE_FORMATS[0]:
+                value = True
+            if suffix == RESOURCE_FORMATS[-2]:
+                state = "disabled"
+            var.set(value)
+            text = f"{name}({suffix})" if name in ["文档", "音频"] else name
+            checkbutton = ttk.Checkbutton(
+                formats_frame, text=text, variable=var, onvalue=1, offvalue=0, state=state
+            )
+            checkbutton.pack(side=tk.LEFT, padx=self.padx)
+        formats = [suffix for suffix, var in self.formats_vars.items() if var.get()]
+        logging.info(f"formats = {formats}")
+
         # 2. 目录+下载按钮
         download_frame = ttk.Frame(main_frame)
         download_frame.pack(fill=tk.X, pady=self.pady)
@@ -443,40 +503,6 @@ class DownloadApp(tk.Tk):
         ttk.Button(download_frame, text="开始下载", command=self.start_download).pack(
             side=tk.LEFT, padx=self.padx * 2
         )
-
-        # 3. 模式选择：两个单选按钮
-        self.mode_var = tk.StringVar(value=self.frame_names[0])
-        mode_frame = ttk.Frame(main_frame)
-        mode_frame.pack(fill=tk.X, pady=self.pady)
-
-        radio1 = ttk.Radiobutton(
-            mode_frame,
-            text=self.frame_titles[0],
-            value=self.frame_names[0],
-            variable=self.mode_var,
-            command=self.switch_mode,
-        )
-        # .pack(side=tk.LEFT, padx=self.padx*2)
-
-        radio2 = ttk.Radiobutton(
-            mode_frame,
-            text=self.frame_titles[1],
-            value=self.frame_names[1],
-            variable=self.mode_var,
-            command=self.switch_mode,
-        )
-        # .pack(side=tk.LEFT, padx=self.padx*2)
-        radio1.grid(row=0, column=0, sticky="w", padx=self.padx * 2, pady=self.pady)
-        radio2.grid(row=0, column=1, sticky="w", padx=self.padx * 2, pady=self.pady)
-
-        # 4. 内容区域，包括两个面板，单选控制
-        self.content_frame = ttk.Frame(main_frame)
-        self.content_frame.pack(fill=tk.BOTH, expand=True)
-        self.selector_frame = BookSelectorFrame(self.content_frame, self.scale)
-        self.inputs_frame = InputURLAreaFrame(self.content_frame, self.scale)
-
-        # 默认显示教材列表面板
-        self.selector_frame.pack(fill=tk.BOTH, expand=True, pady=self.pady * 2)
 
         # 底部添加进度条区域
         self.progress_frame = ttk.Frame(main_frame)
@@ -520,7 +546,12 @@ class DownloadApp(tk.Tk):
             urls = self.inputs_frame.get_urls()
 
         if not urls:
-            messagebox.showwarning("警告", "请先选择或输入要下载的资源")
+            messagebox.showwarning("警告", "请先选择要下载的资源或输入链接")
+            return
+
+        suffix_list = [suffix for suffix, var in self.formats_vars.items() if var.get()]
+        if len(suffix_list) == 0:
+            messagebox.showwarning("警告", "请至少选择一个下载的资源类型。")
             return
 
         # 确认下载弹窗
@@ -533,7 +564,7 @@ class DownloadApp(tk.Tk):
             self.progress_var.set(0)
             self.progress_label.config(text="准备开始下载...")
             self.update()
-            result, elapsed_time = self.simple_download(urls)
+            result, elapsed_time = self.simple_download(urls, suffix_list)
             self.progress_label.config(text="下载完成。")
 
             if result:
@@ -545,15 +576,9 @@ class DownloadApp(tk.Tk):
         except Exception as e:
             messagebox.showerror("错误", f"下载失败：{str(e)}")
 
-    def simple_download(self, urls, audio=False):
-        def _extract_resource_url(data):
-            suffix_list = ["pdf"]
-            if audio:
-                suffix_list.extend(["mp3"])
-            return extract_resource_url(data, suffix_list)
-
+    def simple_download(self, urls, suffix_list):
         save_path = self.dir_var.get()
-        logging.debug(f"\n共选择 {len(urls)} 项目，将保存到 {save_path} 目录，")
+        logging.debug(f"\n共选择 {len(urls)} 项目，将保存到 {save_path} 目录，类型 {suffix_list}")
 
         # 更新进度显示
         self.progress_label.config(text="正在解析URL...")
@@ -561,16 +586,21 @@ class DownloadApp(tk.Tk):
         self.progress_var.set(base_progress)
         self.update()
 
-        config_urls = parse_urls(urls, audio)
-        resource_dict = fetch_all_data(config_urls, _extract_resource_url)
+        config_urls = parse_urls(urls, suffix_list)
+        resource_dict = fetch_all_data(
+            config_urls, lambda data: extract_resource_url(data, suffix_list)
+        )
+
         total = len(resource_dict)
-        self.progress_label.config(text=f"共找到配置 {len(config_urls)} 项，资源文件 {total} 项")
+        self.progress_label.config(
+            text=f"共找到配置链接 {len(config_urls)} 项，资源文件 {total} 项"
+        )
         base_progress = 20
         self.progress_var.set(base_progress)
         self.update()
 
         if total == 0:
-            logging.warning("\n没有找到资源文件（PDF/MP3等）。结束下载")
+            logging.warning(f"\n没有找到资源文件（{'/'.join(suffix_list)}等）。结束下载")
             return None, None
 
         # 开始下载
@@ -602,9 +632,19 @@ def set_dpi_scale():
     return scale, os_name
 
 
+def set_theme(theme=None):
+    import sv_ttk
+    import darkdetect
+
+    if not theme or theme not in ["dark", "light"]:
+        theme = darkdetect.theme()
+    sv_ttk.set_theme(theme)
+
+
 def main():
     scale, os_name = set_dpi_scale()
     app = DownloadApp(scale, os_name)
+    set_theme()
     app.eval("tk::PlaceWindow . center")
     app.mainloop()
 

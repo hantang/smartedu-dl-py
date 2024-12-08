@@ -55,6 +55,9 @@ def get_headers():
 
 
 def get_file_path(base_file, filename):
+    if filename is None:
+        return None
+
     current_dir = Path(base_file).parent
     logging.debug(f"base = {base_file}\ncurrent_dir={current_dir}")
 

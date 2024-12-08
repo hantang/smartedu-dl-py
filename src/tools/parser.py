@@ -36,6 +36,7 @@ TI_FORMATS = [
 ]
 
 ACCEPTED_FORMATS = [t for k, v in RESOURCE_TYPE_DICT.items() if k != "assets_video" for t in v[1]]
+FORMATS_REMAP = {"mp4": "m3u8"}
 
 DOMAIN_REMAP_DICT = {
     "web-bd.ykt.eduyun.cn": "basic.smartedu.cn",
@@ -336,6 +337,7 @@ def extract_resource_url(data: dict | list, suffix_list: list) -> list:
     out = []
     for suffix in suffix_list:
         suffix = suffix.strip().lower()
+        suffix = FORMATS_REMAP.get(suffix, suffix)
         if suffix not in ACCEPTED_FORMATS:
             continue
         result = _extract_resource(data, suffix)
