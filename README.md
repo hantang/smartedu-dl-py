@@ -5,11 +5,18 @@
 
 > 智慧教育平台资源下载工具
 
-## 功能说明
+## 📝 功能说明
 
 主要支持`smartedu.cn`教材、课件（PDF 格式）下载存储。
 
-## 命令行版说明
+🚨 **注意**：
+如果下载中出现“检测到病毒”，请尝试暂时关闭相关病毒检测再下载使用
+（macos 系统在【设置/隐私】中设置允许打开）。
+由于软件没有认证措施，`Pyinstaller`打包可能存在误报。
+提供的下载包都是通过 Github Actions 自动编译提交的。
+有条件的，也可按照下面说明下载仓库代码后在本地执行（需要预先配置 Python 环境）。
+
+## ⌨️ 命令行版说明
 
 ```shell
 Usage: app-cli.py [OPTIONS]
@@ -56,23 +63,26 @@ python app-cli.py -u $URL -f $FILE
 | -------------------------------- | -------------------------------- |
 | ![](images/cli-snapshot-mac.png) | ![](images/cli-snapshot-win.png) |
 
-## 图像界面模式
+## 🖥️ 图像界面模式
 
 ```shell
+# 更新依赖
+pip install -r requirements.txt
+
 # 支持解析下载PDF、音频等格式。
-python app-tk.pyw
+python src/app-tk.pyw
 ```
 
-| 界面     | macos                             | windows                            |
-| -------- | --------------------------------- | ---------------------------------- |
+| 界面     | macos                              | windows                            |
+| -------- | ---------------------------------- | ---------------------------------- |
 | 教材列表 | ![](images/gui-snapshot-mac1a.png) | ![](images/gui-snapshot-win1b.png) |
-| 手动输入 | ![](images/gui-snapshot-mac2a.png) | ![](images/gui-snapshot-win2b.png)  |
+| 手动输入 | ![](images/gui-snapshot-mac2a.png) | ![](images/gui-snapshot-win2b.png) |
 
-## 依赖
+## 🌐 依赖
 
 参见: `requirements.txt`文件。
 
-## 相关参考
+## 💡 相关参考
 
 - [happycola233/tchMaterial-parser](https://github.com/happycola233/tchMaterial-parser)
 - [52beijixing/smartedu-download](https://github.com/52beijixing/smartedu-download)
