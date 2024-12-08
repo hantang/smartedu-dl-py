@@ -51,10 +51,26 @@ def get_font(families: list, size: int, weight: str = "normal"):
     return (None, size, weight)
 
 
+def update_labels_wraplength(event, labels, scale=1.0, delta=20, frame=None):
+    # 更新标签的wraplength
+    if not labels:
+        return
+    if frame:
+        width = frame.winfo_width()
+    elif event:
+        width = event.width
+    else:
+        width = labels[0].winfo_toplevel().winfo_width()
+    wraplength = int(width - delta * scale)
+
+    for label in labels:
+        label.config(wraplength=wraplength)
+
+
 class BookSelectorFrame(ttk.Frame):
     """自定义选择框架"""
 
-    def __init__(self, parent, scale=1.0):
+    def __init__(self, parent, scale=1.0, os_name=None):
         super().__init__(parent)
         # 初始化属性
         self.hier_dict = None
@@ -63,10 +79,11 @@ class BookSelectorFrame(ttk.Frame):
         self.frame_names = ["选择课本", "选择教材"]
         self.level_hiers = []
         self.level_options = []  # 下拉框数据，[id, name]
-        self.wraplength = int(450 * scale)
+        # self.wraplength = int(450 * scale)
+        self.scale = scale
         self.padx = int(5 * scale)
         self.pady = int(5 * scale)
-        self.checkbox_height = int(200 * scale)
+        self.checkbox_height = int(100 * scale)
 
         self.selected_items = set()  # 多选框选中的条目
         self.checkbox_list = []  # 多选框
@@ -74,14 +91,16 @@ class BookSelectorFrame(ttk.Frame):
 
         self.pack(fill=tk.BOTH, expand=True)
 
-        # 创建上下两个部分
-        # self.books_frame = ttk.Frame(self)
+        # 创建左右两个部分
         self.books_frame = ttk.LabelFrame(self, text=self.frame_names[0], padding=self.padx * 2)
-        self.books_frame.pack(fill=tk.BOTH, expand=True, padx=self.padx, pady=self.padx)
+        self.books_frame.pack(
+            side=tk.LEFT, fill=tk.BOTH, expand=True, padx=self.padx, pady=self.padx
+        )
 
-        # self.hierarchy_frame = ttk.Frame(self)
         self.hierarchy_frame = ttk.LabelFrame(self, text=self.frame_names[1], padding=self.padx * 2)
-        self.hierarchy_frame.pack(fill=tk.BOTH, expand=True, padx=self.padx, pady=self.padx)
+        self.hierarchy_frame.pack(
+            side=tk.LEFT, fill=tk.BOTH, expand=True, padx=self.padx, pady=self.padx
+        )
 
         self.setup_books_frame()
         self.setup_hierarchy_frame()
@@ -89,38 +108,44 @@ class BookSelectorFrame(ttk.Frame):
     def setup_books_frame(self):
         """设置课本部分"""
         # 上半部分：多选框的frame（滚动条）
-        self.checkbox_frame = ttk.Frame(self.books_frame)
-        self.checkbox_frame.pack(fill=tk.BOTH, expand=True)
+        checkbox_frame = ttk.Frame(self.books_frame)
+        checkbox_frame.pack(fill=tk.BOTH, expand=True)
 
         # 创建Canvas和Scrollbar
-        self.canvas = tk.Canvas(self.checkbox_frame, highlightthickness=0)
-        self.scrollbar = ttk.Scrollbar(
-            self.checkbox_frame, orient="vertical", command=self.canvas.yview
-        )
-        self.scrollable_frame = ttk.Frame(self.canvas)
+        canvas = tk.Canvas(checkbox_frame, highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(checkbox_frame, orient="vertical", command=canvas.yview)
+        self.scrollable_frame = ttk.Frame(canvas)
 
         # 绑定Canvas和Scrollbar
         self.scrollable_frame.bind(
-            "<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+            "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
-
-        self.canvas.create_window((self.padx, 0), window=self.scrollable_frame, anchor="nw")
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        canvas.create_window((self.padx, 0), window=self.scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=self.scrollbar.set)
 
         # 设置最大高度
-        self.checkbox_frame.configure(height=self.checkbox_height)  # 设置最大高度
-        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        # 绑定鼠标滚轮事件
-        self.canvas.bind_all("<MouseWheel>", self.on_mouse_wheel)
+        checkbox_frame.configure(height=self.checkbox_height)  # 设置最大高度
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # 处理鼠标滚轮事件
+        canvas.bind_all(
+            "<MouseWheel>", lambda e: canvas.yview_scroll(-1 if e.delta > 0 else 1, "units")
+        )
+        # self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        checkbox_frame.bind(
+            "<Configure>",
+            lambda e: update_labels_wraplength(
+                e, [v[2] for v in self.checkbox_list], self.scale, 80, checkbox_frame
+            ),
+        )
+
         # 下半部分：全选和取消全选按钮
         btn_frame = ttk.Frame(self.books_frame)
         btn_frame.pack(side=tk.BOTTOM, padx=self.padx)
 
         self.select_all_btn = ttk.Button(btn_frame, text="全选", command=self.select_all)
         self.deselect_all_btn = ttk.Button(btn_frame, text="取消全选", command=self.deselect_all)
-        self.select_all_btn.pack(side=tk.RIGHT)
-        self.deselect_all_btn.pack(side=tk.RIGHT)
+        self.select_all_btn.pack(side=tk.RIGHT, padx=self.padx)
+        self.deselect_all_btn.pack(side=tk.RIGHT, padx=self.padx)
         self.select_all_btn.config(state=tk.DISABLED)
         self.deselect_all_btn.config(state=tk.DISABLED)
 
@@ -132,15 +157,13 @@ class BookSelectorFrame(ttk.Frame):
 
         # 下半部分：查询按钮
         query_btn_frame = ttk.Frame(self.hierarchy_frame)
-        query_btn_frame.pack(side=tk.BOTTOM, anchor="se", padx=self.padx, pady=self.pady)
+        query_btn_frame.pack(side=tk.BOTTOM, anchor="s")
 
         self.query_btn = ttk.Button(query_btn_frame, text="查询", command=self.query_data)
         self.query_btn.pack(side=tk.RIGHT)
 
     def query_data(self):
         """查询数据并更新下拉框"""
-        # 这里可以添加查询逻辑
-        # messagebox.showinfo("查询", "查询数据并更新下拉框的逻辑")
         # 获取第一级数据
         if self.hier_dict is None:
             self.hierarchy_frame.config(text="联网查询教材数据中……")
@@ -174,20 +197,24 @@ class BookSelectorFrame(ttk.Frame):
         self.create_combobox(0, name, options)
 
     def create_combobox(self, index, name, options):
-        grid_count = 2
         self._destroy_combobox(index + 1)
         self.update_checkbox(None)
 
-        # Create a frame for the combobox to control its width
         frame = ttk.Frame(self.combo_frame)
-        frame.grid(row=index // grid_count, column=index % grid_count, padx=self.padx)
-        label = ttk.Label(frame, text=f"[{name}]")
-        label.pack(fill=tk.X, side=tk.TOP, expand=True)  # 设置水平居中
+        frame.pack(fill=tk.X, side=tk.TOP, expand=True)
+        level_count = len(self.level_options) - 1
+        label = ttk.Label(frame, text=f"{level_count}. 【{name}】", font=("bold",))
+        label.pack(fill=tk.X)
         option_names = [op[1] for op in options]
         cb = ttk.Combobox(frame, state="readonly", values=option_names)
-        cb.pack(fill=tk.X, expand=True)
+        cb.pack(fill=tk.X)  # , expand=True
         cb.bind("<<ComboboxSelected>>", lambda e: self.on_combobox_select(index, cb.get()))
         self.combobox_list.append([label, cb, frame])
+
+        if len(option_names) == 0:
+            self.hierarchy_frame.configure(text=f"{self.frame_names[1]}: {name} 数据为空")
+        else:
+            self.hierarchy_frame.configure(text=self.frame_names[1])
 
     def on_combobox_select(self, index: int, value: str):
         """处理选事件"""
@@ -218,6 +245,7 @@ class BookSelectorFrame(ttk.Frame):
         level, name, options = query_metadata(key, current_hier_dict, self.tag_dict, self.id_dict)
         self.level_hiers.append(current_hier_dict[key])
         self.level_options.append(options)
+
         return level, name, options
 
     def _destroy_combobox(self, index):
@@ -238,28 +266,40 @@ class BookSelectorFrame(ttk.Frame):
 
         self.checkbox_list = []
         self.selected_items = set()
-        if options is None:
+        self.scrollbar.pack_forget()  # 隐藏滚动条
+        logging.debug(f"=>>> options = {options}")
+        if not options:
             self.select_all_btn.config(state=tk.DISABLED)
             self.deselect_all_btn.config(state=tk.DISABLED)
             self.books_frame.config(text=self.frame_names[0])
+            if options is not None and len(options) == 0:
+                self.books_frame.config(text=f"{self.frame_names[0]}: 数据为空")
             return
 
+        width = len(str(len(options)))
         for i, (book_id, book_name) in enumerate(options):
             var = tk.BooleanVar()
+            var.set(False)
+            frame = ttk.Frame(self.scrollable_frame)
+            frame.pack(fill=tk.X, side=tk.TOP, expand=True)
             cb = ttk.Checkbutton(
-                self.scrollable_frame,
+                frame,
                 variable=var,
                 command=lambda id=book_id: self.toggle_checkbox_selection(id),
             )
-            # 使用label自动换行
-            label = ttk.Label(self.scrollable_frame, text=book_name, wraplength=self.wraplength)
-            cb.grid(row=i, column=0, sticky="w", padx=self.padx * 2, pady=self.pady)
-            label.grid(row=i, column=1, sticky="w")
+            # 使用label自动换行 TODO
+            label = ttk.Label(frame, text=f"{i+1:0{width}d}. {book_name}")
+            # cb.grid(row=i, column=0, sticky="w", padx=self.padx * 2, pady=self.pady)
+            # label.grid(row=i, column=1, sticky="w")
+            cb.pack(side=tk.LEFT)
+            label.pack(side=tk.LEFT)
             self.checkbox_list.append((var, cb, label))
 
-        if self.checkbox_list:
+        if options:
+            self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
             self.select_all_btn.config(state=tk.NORMAL)
             self.deselect_all_btn.config(state=tk.NORMAL)
+            self.books_frame.config(text=f"{self.frame_names[0]}: 共 {len(options)} 项资源")
 
     def toggle_checkbox_selection(self, book_id: str):
         """切换选择状态"""
@@ -293,24 +333,19 @@ class BookSelectorFrame(ttk.Frame):
         """获取选中的URL列表"""
         return gen_url_from_tags(list(self.selected_items))
 
-    def on_mouse_wheel(self, event):
-        """处理鼠标滚轮事件"""
-        # 向上滚动
-        if event.delta > 0:
-            self.canvas.yview_scroll(-1, "units")
-        # 向下滚动
-        else:
-            self.canvas.yview_scroll(1, "units")
-
 
 class InputURLAreaFrame(ttk.Frame):
     """手动输入面板"""
 
-    def __init__(self, parent, scale=1.0):
+    def __init__(self, parent, scale=1.0, os_name=None):
         super().__init__(parent)
-        self.wraplength = int(500 * scale)
+        self.scale = scale
         self.padx = int(5 * scale)
         self.pady = int(5 * scale)
+        self.font_size = 16
+        if os_name == "Windows":
+            self.font_size = int(self.font_size / scale * 1.5)
+
         self.setup_ui()
 
     def setup_ui(self):
@@ -323,7 +358,13 @@ class InputURLAreaFrame(ttk.Frame):
         # 创建文本框和滚动条
         text_frame = ttk.Frame(input_frame)
         text_frame.pack(fill=tk.BOTH, expand=True, pady=self.pady)
-        # TODO 显示行号
+
+        self.text = tk.Text(text_frame, height=5, width=20, font=("Arial", self.font_size))
+        scrollbar = ttk.Scrollbar(text_frame, orient="vertical", command=self.text.yview)
+        self.text.configure(yscrollcommand=scrollbar.set)
+
+        self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         # 添加清空按钮
         btn_frame = ttk.Frame(input_frame)
@@ -333,16 +374,9 @@ class InputURLAreaFrame(ttk.Frame):
         )
         clean_btn.pack(side=tk.RIGHT)
 
-        self.text = tk.Text(text_frame, height=15)
-        scrollbar = ttk.Scrollbar(text_frame, orient="vertical", command=self.text.yview)
-        self.text.configure(yscrollcommand=scrollbar.set)
-
-        self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
         # 创建说明区域
         help_frame = ttk.LabelFrame(self, text="格式说明", padding=self.padx * 2)
-        help_frame.pack(fill=tk.BOTH, padx=self.padx, pady=self.pady)
+        help_frame.pack(fill=tk.X, padx=self.padx, pady=self.pady)
 
         keys = ["/tchMaterial", "/syncClassroom"]
         texts = ""
@@ -352,9 +386,13 @@ class InputURLAreaFrame(ttk.Frame):
 
         help_text = f"支持的URL格式示例：\n{texts}\n可以直接从浏览器地址复制URL。"
         help_label = ttk.Label(
-            help_frame, text=help_text, wraplength=self.wraplength, justify=tk.LEFT
+            help_frame,
+            text=help_text,
+            justify=tk.LEFT,
+            font=get_font(["楷体", "Kaiti", "STKaiti"], int(self.font_size * 0.9), "normal"),
         )
         help_label.pack(fill=tk.X, padx=self.padx, pady=self.pady)
+        help_frame.bind("<Configure>", lambda e: update_labels_wraplength(e, [help_label], self.scale))
 
     def get_urls(self) -> list:
         """获取输入的URL列表"""
@@ -375,9 +413,9 @@ class DownloadApp(tk.Tk):
         self.download_dir = Path.home() / "Downloads"  # 改为用户目录
 
         self.scale = scale
-        width = int(600 * scale)
-        height = int(850 * scale)
-        self.wraplength = int(500 * scale)
+        self.os_name = os_name
+        width = int(750 * scale)
+        height = int(700 * scale)
         self.padx = int(5 * scale)
         self.pady = int(5 * scale)
         self.font_size = 12
@@ -388,6 +426,7 @@ class DownloadApp(tk.Tk):
         # 图形大小
         self.title(self.desc_texts[0])
         self.geometry(f"{width}x{height}")
+        self.wm_minsize(width=int(width * 0.8), height=int(height * 0.9))
         # self.resizable(False, False)  # Prevent resizing the window
 
         # 设置主题
@@ -407,26 +446,29 @@ class DownloadApp(tk.Tk):
         main_frame = ttk.Frame(self)  # padding=self.padx*2
         main_frame.pack(fill=tk.BOTH, expand=True)
 
+        self.setup_title_frame(main_frame)
+        self.setup_mode_frame(main_frame)
+        self.setup_control_frame(main_frame)
+
+    def setup_title_frame(self, main_frame):
         # 1. 添加标题和LOGO
         title_frame = ttk.Frame(main_frame)
-        title_frame.pack(fill=tk.X)
+        title_frame.pack(fill=tk.BOTH, expand=True)
 
         ttk.Label(
             title_frame,
             text=LOGO_TEXT,
+            anchor=tk.CENTER,
             font=get_font(["Monaco", "Courier New"], self.font_size, "bold"),
-            anchor="center",
-        ).pack(fill=tk.BOTH)
-        ttk.Label(title_frame, text=self.desc_texts[1]).pack(pady=self.pady * 2)
-        ttk.Label(
+        ).pack(fill=tk.BOTH, expand=True)
+        slogan_label = ttk.Label(
             title_frame,
             text=self.desc_texts[2],
-            wraplength=self.wraplength,
-            font=get_font(["楷体", "Kaiti", "STKaiti"], self.font_size, "normal"),
-        ).pack(pady=self.pady)
-
-        self.setup_mode_frame(main_frame)
-        self.setup_control_frame(main_frame)
+            anchor=tk.CENTER,
+            font=get_font(["楷体", "Kaiti", "STKaiti"], int(self.font_size * 1.2), "normal"),
+        )
+        slogan_label.pack(fill=tk.BOTH, expand=True, pady=self.pady)
+        title_frame.bind("<Configure>", lambda e: update_labels_wraplength(e, [slogan_label], self.scale))
 
     def setup_mode_frame(self, main_frame):
         # 3. 模式选择：两个单选按钮
@@ -449,14 +491,14 @@ class DownloadApp(tk.Tk):
             variable=self.mode_var,
             command=self.switch_mode,
         )
-        radio1.pack(side=tk.LEFT, fill=tk.X, padx=self.padx*2)
-        radio2.pack(side=tk.LEFT, fill=tk.X, padx=self.padx*2)
+        radio1.pack(side=tk.LEFT, fill=tk.X, padx=self.padx * 2)
+        radio2.pack(side=tk.LEFT, fill=tk.X, padx=self.padx * 2)
 
         # 4. 内容区域，包括两个面板，单选控制
         self.content_frame = ttk.Frame(main_frame)
         self.content_frame.pack(fill=tk.BOTH, expand=True)
-        self.selector_frame = BookSelectorFrame(self.content_frame, self.scale)
-        self.inputs_frame = InputURLAreaFrame(self.content_frame, self.scale)
+        self.selector_frame = BookSelectorFrame(self.content_frame, self.scale, self.os_name)
+        self.inputs_frame = InputURLAreaFrame(self.content_frame, self.scale, self.os_name)
 
         # 默认显示教材列表面板
         self.selector_frame.pack(fill=tk.BOTH, expand=True, pady=self.pady * 2)
