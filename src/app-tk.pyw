@@ -10,9 +10,6 @@ import tkinter.font as tkFont
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-import sv_ttk
-# import darkdetect
-
 from tools.downloader import download_files_tk, fetch_all_data
 from tools.logo import DESCRIBES, LOGO_TEXT
 from tools.parser import extract_resource_url, parse_urls, RESOURCE_DICT
@@ -680,39 +677,10 @@ def set_dpi_scale():
     return scale, os_name
 
 
-def set_theme(theme=None, font_family=None, font_scale=1.0):
-    if not theme or theme not in ["dark", "light"]:
-        theme = "light"
-    sv_ttk.set_theme(theme)
-
-    default_font = tkFont.nametofont("TkDefaultFont")
-    # windows: {'family': 'Microsoft YaHei UI', 'size': 9, 'weight': 'normal', 'slant': 'roman', 'underline': 0, 'overstrike': 0}
-    # macos: {'family': '.AppleSystemUIFont', 'size': 13, 'weight': 'normal', 'slant': 'roman', 'underline': 0, 'overstrike': 0}
-
-    family = font_family if font_family else default_font.actual("family")
-    # Update font: SunValley*Font: 12/14/.../68
-    parts = [
-        "Caption",
-        "Body",
-        "BodyStrong",
-        "BodyLarge",
-        "Subtitle",
-        "Title",
-        "TitleLarge",
-        "Display",
-    ]
-    for font_name in parts:
-        font = tkFont.nametofont(f"SunValley{font_name}Font")
-        # size = font.actual("size")
-        size = font.cget("size")
-        font.configure(size=int(size * font_scale))
-        font.configure(family=family)
-
-
-def main(theme):
+def main(theme=None):
     scale, os_name = set_dpi_scale()
     app = DownloadApp(scale, os_name)
-    set_theme(theme=theme, font_scale=scale)
+    # set_theme(theme=theme, font_scale=scale)
     app.eval("tk::PlaceWindow . center")
     app.mainloop()
 
