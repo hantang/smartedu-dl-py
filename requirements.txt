@@ -1,5 +1,4 @@
 requests>=2.31.0
 click>=8.0.0
 rich>=13.0.0
-sv-ttk~=2.6.0
-darkdetect~=0.8.0
+sv-ttk>=2.6.0

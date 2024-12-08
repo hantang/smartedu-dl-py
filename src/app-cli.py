@@ -20,7 +20,6 @@ from tools.parser import extract_resource_url, parse_urls, validate_url
 from tools.parser2 import fetch_metadata, gen_url_from_tags, query_metadata
 from tools.utils import get_file_path
 
-
 DEFAULT_URLS = []
 DATA_PATH = "../data"
 DEFAULT_PATH = "./downloads"
@@ -207,11 +206,11 @@ def simple_download(urls, save_path, formats):
 
     # 下载文件
     with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        console=console,
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console,
     ) as progress:
         download_task = progress.add_task("正在下载文件...", total=total)
         results = download_files(resource_dict, save_path)
@@ -286,7 +285,7 @@ def _interactive_mode1(hier_dict, tag_dict, id_dict, retry=3):
                 level_records.append(options[int(selected_index) - 1] + [""])
                 break
             else:
-                click.secho(f"输入不合法，请重新输入（第{i+1}/{retry}次）", fg="red")
+                click.secho(f"输入不合法，请重新输入（第{i + 1}/{retry}次）", fg="red")
         else:
             logging.debug("错误次数过多，重置")
             options = []
@@ -315,7 +314,7 @@ def _interactive_mode2(retry=3):
         if urls_to_process:
             display_entries(urls_to_process, "已输入列表", "有效URL")
             break
-        click.secho(f"未输入有效URL，请重新输入（第{i+1}/{retry}次）", fg="red")
+        click.secho(f"未输入有效URL，请重新输入（第{i + 1}/{retry}次）", fg="red")
     return urls_to_process
 
 
@@ -333,7 +332,7 @@ def _interactive_filter(urls_to_process, retry=3):
         if selected_indices:
             selected_urls = [urls_to_process[i - 1] for i in selected_indices]
             break
-        click.secho(f"无效的选择，请重新输入（第{i+1}/{retry}次）", fg="red")
+        click.secho(f"无效的选择，请重新输入（第{i + 1}/{retry}次）", fg="red")
 
     resource_urls = []
     for url in selected_urls:
@@ -353,7 +352,7 @@ def _interactive_path(save_path, retry=3):
         if is_valid:
             save_path = validated_path
             break
-        click.secho(f"无效的路径：【{save_path}】，请重新输入（第{i+1}/{retry}次）", fg="red")
+        click.secho(f"无效的路径：【{save_path}】，请重新输入（第{i + 1}/{retry}次）", fg="red")
     return save_path
 
 
@@ -421,12 +420,12 @@ def interactive_download(default_output: str, audio: bool):
 @click.option("--list_file", "-f", type=click.Path(exists=True), help="包含URL的文件")
 @click.option("--output", "-o", type=click.Path(), default=DEFAULT_PATH, help="下载文件保存目录")
 def main(
-    debug: bool,
-    interactive: bool,
-    formats: Optional[str],
-    urls: Optional[str],
-    list_file: Optional[str],
-    output: str,
+        debug: bool,
+        interactive: bool,
+        formats: Optional[str],
+        urls: Optional[str],
+        list_file: Optional[str],
+        output: str,
 ):
     # 如果是请求帮助信息，不需要显示欢迎信息
     if any(arg in sys.argv[1:] for arg in ["-h", "--help"]):

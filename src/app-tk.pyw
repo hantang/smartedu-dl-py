@@ -2,13 +2,16 @@
 图形界面版本（tkinter实现）：智慧教育平台资源下载工具
 """
 
+import argparse
 import logging
-import sys
 import time
 import tkinter as tk
 import tkinter.font as tkFont
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
+
+import sv_ttk
+# import darkdetect
 
 from tools.downloader import download_files_tk, fetch_all_data
 from tools.logo import DESCRIBES, LOGO_TEXT
@@ -117,9 +120,8 @@ class BookSelectorFrame(ttk.Frame):
         checkbox_frame.bind(
             "<Configure>",
             lambda e: update_labels_wraplength(
-                e, [v[2] for v in self.checkbox_list], self.scale, 80, checkbox_frame
-            ),
-        )
+                e, [v[2] for v in self.checkbox_list], self.scale, int(60 * self.scale), checkbox_frame
+        ))
 
         # 下半部分：全选和取消全选按钮
         btn_frame = ttk.Frame(self.books_frame)
@@ -273,7 +275,7 @@ class BookSelectorFrame(ttk.Frame):
                 command=lambda id=book_id: self.toggle_checkbox_selection(id),
             )
             # 使用label自动换行
-            label = ttk.Label(frame, text=f"{i+1:0{width}d}. {book_name}")
+            label = ttk.Label(frame, text=f"{i + 1:0{width}d}. {book_name}")
             cb.pack(side=tk.LEFT)
             label.pack(side=tk.LEFT)
             self.checkbox_list.append((var, cb, label))
@@ -679,11 +681,8 @@ def set_dpi_scale():
 
 
 def set_theme(theme=None, font_family=None, font_scale=1.0):
-    import sv_ttk
-    import darkdetect
-
     if not theme or theme not in ["dark", "light"]:
-        theme = darkdetect.theme()
+        theme = "light"
     sv_ttk.set_theme(theme)
 
     default_font = tkFont.nametofont("TkDefaultFont")
@@ -710,21 +709,26 @@ def set_theme(theme=None, font_family=None, font_scale=1.0):
         font.configure(family=family)
 
 
-def main():
+def main(theme):
     scale, os_name = set_dpi_scale()
     app = DownloadApp(scale, os_name)
-    set_theme(font_scale=scale)
+    set_theme(theme=theme, font_scale=scale)
     app.eval("tk::PlaceWindow . center")
     app.mainloop()
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--theme", "-t", default="light", type=str, choices=["light", "dark"])
+    args = parser.parse_args()
+
     # 配置日志
     fmt = "%(asctime)s %(filename)s [line:%(lineno)d] %(levelname)s %(message)s"
     log_level = logging.INFO
-    if any(arg in sys.argv[1:] for arg in ["--debug"]):
+    if args.debug:
         log_level = logging.DEBUG
     logging.basicConfig(level=log_level, format=fmt)
     logging.debug("调试模式已启用")
 
-    main()
+    main(args.theme)
