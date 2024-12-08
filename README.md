@@ -36,14 +36,14 @@ pip install -r requirements.txt
 cd src/
 
 # 交互模式，进入后选择：
-# 1. 查询科目列表：展示电子教材（学业阶段）->学科、版本等
+# 1. 查询科目列表：展示电子教材（学业阶段）->学科、版本等；支持输入0回退，输入exit退出。
 # 2. 手动输入URL：教材或课件详情页的链接，可逗号分隔。
 python app-cli.py
-python app-cli.py -i # -i 参数可选，默认交互模式。
+python app-cli.py -i # 交互模式（同上），-i 参数可选。不要和-u/-f连用
 
-# 其他参数：-o 修改默认目录，--audio 表示如果有音频资源也解析并下载
+# 其他参数：-o 修改默认目录，--formats 提供更多资源类型下载【暂不支持PDF】
 python app-cli.py -o $SAVEDIR
-python app-cli.py --audio
+python app-cli.py --formats pdf,mp3
 
 # 命令模式:
 # URL: 链接字符串，逗号分隔多个链接
@@ -59,14 +59,14 @@ python app-cli.py -u $URL -f $FILE
 ## 图像界面模式
 
 ```shell
-# 目前仅解析PDF
+# 支持解析下载PDF、音频等格式。
 python app-tk.pyw
 ```
 
 | 界面     | macos                             | windows                            |
 | -------- | --------------------------------- | ---------------------------------- |
-| 教材列表 | ![](images/gui-snapshot-mac1.png) | ![](images/gui-snapshot-win1a.png) |
-| 手动输入 | ![](images/gui-snapshot-mac2.png) | ![](images/gui-snapshot-win2.png)  |
+| 教材列表 | ![](images/gui-snapshot-mac1a.png) | ![](images/gui-snapshot-win1b.png) |
+| 手动输入 | ![](images/gui-snapshot-mac2a.png) | ![](images/gui-snapshot-win2b.png)  |
 
 ## 依赖
 
@@ -76,4 +76,4 @@ python app-tk.pyw
 
 - [happycola233/tchMaterial-parser](https://github.com/happycola233/tchMaterial-parser)
 - [52beijixing/smartedu-download](https://github.com/52beijixing/smartedu-download)
-- 图标来自：<https://www.smartedu.cn/>
+- 图标来自或修改自：<https://www.smartedu.cn/>
