@@ -105,12 +105,19 @@ def fetch_single_data(
     url: str, headers: dict, timeout: int, data_format: str = "json"
 ) -> list | dict | str | None:
     # 获取json配置
-    response = requests.get(url, timeout=timeout, headers=headers)
-    # logging.debug(f"URL = {url}, status = {response.status_code}")
-    if response.ok:
-        return response.json() if data_format == "json" else response.text
-    else:
+    try:
+        response = requests.get(url, timeout=timeout, headers=headers)
+        # logging.debug(f"URL = {url}, status = {response.status_code}")
+        if response.ok:
+            return response.json() if data_format == "json" else response.text
         logging.debug(f"Failed url={url}, status={response.status_code}")
+    except requests.exceptions.RequestException as res_err:
+        logging.warning(f"URL: {url}; Request Error: {res_err}")
+    except IOError as io_err:
+        logging.warning(f"URL: {url}; IO Error: {io_err}")
+    except Exception as err:
+        logging.error(f"Download failed: {url}, 错误: {err}")
+
     return None
 
 

@@ -36,21 +36,6 @@ def display_results(results: list, elapsed_time: float):
     return "\n".join([": ".join(v) for v in messages])
 
 
-def get_font(families: list, size: int, weight: str = "normal"):
-    """获取字体，如果指定字体不可用则返回默认字体"""
-    weight = weight.strip().lower()
-    if weight not in ["normal", "bold"]:
-        weight = "normal"
-    try:
-        for family in families:
-            font = tkFont.Font(family=family, size=size, weight=weight)
-            if font.actual("family") == family:
-                return (family, size, weight)
-    except Exception:
-        pass
-    return (None, size, weight)
-
-
 def update_labels_wraplength(event, labels, scale=1.0, delta=20, frame=None):
     # 更新标签的wraplength
     if not labels:
@@ -70,8 +55,16 @@ def update_labels_wraplength(event, labels, scale=1.0, delta=20, frame=None):
 class BookSelectorFrame(ttk.Frame):
     """自定义选择框架"""
 
-    def __init__(self, parent, scale=1.0, os_name=None):
+    def __init__(self, parent, fonts, font_size, scale=1.0, os_name=None):
         super().__init__(parent)
+
+        self.fonts = fonts
+        self.font_size = font_size
+        self.scale = scale
+        self.padx = int(5 * scale)
+        self.pady = int(5 * scale)
+        self.checkbox_height = int(100 * scale)
+
         # 初始化属性
         self.hier_dict = None
         self.tag_dict = None
@@ -79,28 +72,18 @@ class BookSelectorFrame(ttk.Frame):
         self.frame_names = ["选择课本", "选择教材"]
         self.level_hiers = []
         self.level_options = []  # 下拉框数据，[id, name]
-        # self.wraplength = int(450 * scale)
-        self.scale = scale
-        self.padx = int(5 * scale)
-        self.pady = int(5 * scale)
-        self.checkbox_height = int(100 * scale)
 
         self.selected_items = set()  # 多选框选中的条目
         self.checkbox_list = []  # 多选框
         self.combobox_list = []  # 下拉框
 
         self.pack(fill=tk.BOTH, expand=True)
-
         # 创建左右两个部分
         self.books_frame = ttk.LabelFrame(self, text=self.frame_names[0], padding=self.padx * 2)
-        self.books_frame.pack(
-            side=tk.LEFT, fill=tk.BOTH, expand=True, padx=self.padx, pady=self.padx
-        )
+        self.books_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=self.padx)
 
         self.hierarchy_frame = ttk.LabelFrame(self, text=self.frame_names[1], padding=self.padx * 2)
-        self.hierarchy_frame.pack(
-            side=tk.LEFT, fill=tk.BOTH, expand=True, padx=self.padx, pady=self.padx
-        )
+        self.hierarchy_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=self.padx)
 
         self.setup_books_frame()
         self.setup_hierarchy_frame()
@@ -191,7 +174,7 @@ class BookSelectorFrame(ttk.Frame):
         self.level_hiers = [self.hier_dict]
         self.level_options = [()]
         selected_key = self.hier_dict["next"][0]
-        level, name, options = self._query(selected_key)
+        _, name, options = self._query(selected_key)
 
         # 创建第一个下拉框
         self.create_combobox(0, name, options)
@@ -201,14 +184,17 @@ class BookSelectorFrame(ttk.Frame):
         self.update_checkbox(None)
 
         frame = ttk.Frame(self.combo_frame)
-        frame.pack(fill=tk.X, side=tk.TOP, expand=True)
+        frame.pack(fill=tk.X, side=tk.TOP, expand=True, padx=self.padx, pady=self.pady)
+
         level_count = len(self.level_options) - 1
         label = ttk.Label(frame, text=f"{level_count}. 【{name}】", font=("bold",))
-        label.pack(fill=tk.X)
+        label.pack(fill=tk.X, expand=True, padx=self.padx * 2)
+
         option_names = [op[1] for op in options]
-        cb = ttk.Combobox(frame, state="readonly", values=option_names)
-        cb.pack(fill=tk.X)  # , expand=True
+        cb = ttk.Combobox(frame, state="readonly", values=option_names, width=10)
+        cb.pack(fill=tk.X, expand=True, pady=self.pady)  #
         cb.bind("<<ComboboxSelected>>", lambda e: self.on_combobox_select(index, cb.get()))
+
         self.combobox_list.append([label, cb, frame])
 
         if len(option_names) == 0:
@@ -260,7 +246,6 @@ class BookSelectorFrame(ttk.Frame):
         self.level_options = self.level_options[: index2 + 1]
 
     def update_checkbox(self, options):
-        # 示例多选框
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
 
@@ -287,10 +272,8 @@ class BookSelectorFrame(ttk.Frame):
                 variable=var,
                 command=lambda id=book_id: self.toggle_checkbox_selection(id),
             )
-            # 使用label自动换行 TODO
+            # 使用label自动换行
             label = ttk.Label(frame, text=f"{i+1:0{width}d}. {book_name}")
-            # cb.grid(row=i, column=0, sticky="w", padx=self.padx * 2, pady=self.pady)
-            # label.grid(row=i, column=1, sticky="w")
             cb.pack(side=tk.LEFT)
             label.pack(side=tk.LEFT)
             self.checkbox_list.append((var, cb, label))
@@ -337,14 +320,13 @@ class BookSelectorFrame(ttk.Frame):
 class InputURLAreaFrame(ttk.Frame):
     """手动输入面板"""
 
-    def __init__(self, parent, scale=1.0, os_name=None):
+    def __init__(self, parent, fonts, font_size, scale=1.0, os_name=None):
         super().__init__(parent)
+        self.fonts = fonts
+        self.font_size = font_size
         self.scale = scale
         self.padx = int(5 * scale)
         self.pady = int(5 * scale)
-        self.font_size = 16
-        if os_name == "Windows":
-            self.font_size = int(self.font_size / scale * 1.5)
 
         self.setup_ui()
 
@@ -359,7 +341,9 @@ class InputURLAreaFrame(ttk.Frame):
         text_frame = ttk.Frame(input_frame)
         text_frame.pack(fill=tk.BOTH, expand=True, pady=self.pady)
 
-        self.text = tk.Text(text_frame, height=5, width=20, font=("Arial", self.font_size))
+        self.text = tk.Text(
+            text_frame, height=5, width=20, font=(self.fonts["sans_serif"], self.font_size)
+        )
         scrollbar = ttk.Scrollbar(text_frame, orient="vertical", command=self.text.yview)
         self.text.configure(yscrollcommand=scrollbar.set)
 
@@ -376,7 +360,7 @@ class InputURLAreaFrame(ttk.Frame):
 
         # 创建说明区域
         help_frame = ttk.LabelFrame(self, text="格式说明", padding=self.padx * 2)
-        help_frame.pack(fill=tk.X, padx=self.padx, pady=self.pady)
+        help_frame.pack(fill=tk.BOTH, expand=True, padx=self.padx, pady=self.pady)
 
         keys = ["/tchMaterial", "/syncClassroom"]
         texts = ""
@@ -386,13 +370,12 @@ class InputURLAreaFrame(ttk.Frame):
 
         help_text = f"支持的URL格式示例：\n{texts}\n可以直接从浏览器地址复制URL。"
         help_label = ttk.Label(
-            help_frame,
-            text=help_text,
-            justify=tk.LEFT,
-            font=get_font(["楷体", "Kaiti", "STKaiti"], int(self.font_size * 0.9), "normal"),
+            help_frame, text=help_text, justify=tk.LEFT, font=(self.fonts["kaiti"], self.font_size)
         )
         help_label.pack(fill=tk.X, padx=self.padx, pady=self.pady)
-        help_frame.bind("<Configure>", lambda e: update_labels_wraplength(e, [help_label], self.scale))
+        help_frame.bind(
+            "<Configure>", lambda e: update_labels_wraplength(e, [help_label], self.scale)
+        )
 
     def get_urls(self) -> list:
         """获取输入的URL列表"""
@@ -418,10 +401,6 @@ class DownloadApp(tk.Tk):
         height = int(700 * scale)
         self.padx = int(5 * scale)
         self.pady = int(5 * scale)
-        self.font_size = 12
-        if os_name == "Windows":
-            self.font_size = int(self.font_size / scale * 1.5)
-        logging.info(f"scale = {scale}, width = {width}, height={height}")
 
         # 图形大小
         self.title(self.desc_texts[0])
@@ -437,6 +416,8 @@ class DownloadApp(tk.Tk):
         small_icon = tk.PhotoImage(file=f"{self.icon_dir}/favicon.png")
         large_icon = tk.PhotoImage(file=f"{self.icon_dir}/icon.png")
         self.iconphoto(False, large_icon, small_icon)
+        self.fonts, default_size = self.setup_fonts()
+        self.font_size = int(default_size * min((1.1 + (scale - 1) * 0.3), 1.5))
 
         self.setup_ui()
 
@@ -450,25 +431,46 @@ class DownloadApp(tk.Tk):
         self.setup_mode_frame(main_frame)
         self.setup_control_frame(main_frame)
 
+    def setup_fonts(self):
+        font_families = {
+            "sans_serif": ["Arial", "Helvetica", "Segoe UI", "Roboto"],
+            "serif": ["Georgia", "Times New Roman"],
+            "monospace": ["Monaco", "Courier New", "Consolas"],
+            "kaiti": ["STKaiti", "SimKai", "楷体"],
+        }
+        default_font = tkFont.nametofont("TkDefaultFont")
+        default_family = default_font.actual("family")
+        default_size = default_font.actual("size")
+        available_fonts = tkFont.families()
+
+        font_dict = {}
+        for key, fonts in font_families.items():
+            for font in fonts:
+                if font in available_fonts:
+                    font_dict[key] = font
+                    break
+            else:
+                font_dict[key] = default_family
+        return font_dict, default_size
+
     def setup_title_frame(self, main_frame):
         # 1. 添加标题和LOGO
         title_frame = ttk.Frame(main_frame)
         title_frame.pack(fill=tk.BOTH, expand=True)
 
         ttk.Label(
-            title_frame,
-            text=LOGO_TEXT,
-            anchor=tk.CENTER,
-            font=get_font(["Monaco", "Courier New"], self.font_size, "bold"),
+            title_frame, text=LOGO_TEXT, anchor=tk.CENTER, font=(self.fonts["monospace"],)
         ).pack(fill=tk.BOTH, expand=True)
         slogan_label = ttk.Label(
             title_frame,
             text=self.desc_texts[2],
             anchor=tk.CENTER,
-            font=get_font(["楷体", "Kaiti", "STKaiti"], int(self.font_size * 1.2), "normal"),
+            font=(self.fonts["kaiti"], self.font_size),
         )
         slogan_label.pack(fill=tk.BOTH, expand=True, pady=self.pady)
-        title_frame.bind("<Configure>", lambda e: update_labels_wraplength(e, [slogan_label], self.scale))
+        title_frame.bind(
+            "<Configure>", lambda e: update_labels_wraplength(e, [slogan_label], self.scale)
+        )
 
     def setup_mode_frame(self, main_frame):
         # 3. 模式选择：两个单选按钮
@@ -497,8 +499,12 @@ class DownloadApp(tk.Tk):
         # 4. 内容区域，包括两个面板，单选控制
         self.content_frame = ttk.Frame(main_frame)
         self.content_frame.pack(fill=tk.BOTH, expand=True)
-        self.selector_frame = BookSelectorFrame(self.content_frame, self.scale, self.os_name)
-        self.inputs_frame = InputURLAreaFrame(self.content_frame, self.scale, self.os_name)
+        self.selector_frame = BookSelectorFrame(
+            self.content_frame, self.fonts, self.font_size, self.scale, self.os_name
+        )
+        self.inputs_frame = InputURLAreaFrame(
+            self.content_frame, self.fonts, self.font_size, self.scale, self.os_name
+        )
 
         # 默认显示教材列表面板
         self.selector_frame.pack(fill=tk.BOTH, expand=True, pady=self.pady * 2)
@@ -507,7 +513,7 @@ class DownloadApp(tk.Tk):
         # New: 资源类型选项
         formats_frame = ttk.Frame(main_frame)
         formats_frame.pack(fill=tk.X, pady=self.pady)
-        ttk.Label(formats_frame, text="资源类型").pack(side=tk.LEFT)
+        ttk.Label(formats_frame, text="资源类型").pack(side=tk.LEFT, padx=self.padx)
 
         self.formats_vars = {}
         for name, suffix in zip(RESOURCE_NAMES, RESOURCE_FORMATS):
@@ -524,8 +530,6 @@ class DownloadApp(tk.Tk):
                 formats_frame, text=text, variable=var, onvalue=1, offvalue=0, state=state
             )
             checkbutton.pack(side=tk.LEFT, padx=self.padx)
-        formats = [suffix for suffix, var in self.formats_vars.items() if var.get()]
-        logging.info(f"formats = {formats}")
 
         # 2. 目录+下载按钮
         download_frame = ttk.Frame(main_frame)
@@ -535,7 +539,7 @@ class DownloadApp(tk.Tk):
         dir_frame = ttk.Frame(download_frame)
         dir_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        ttk.Label(dir_frame, text="保存目录：").pack(side=tk.LEFT)
+        ttk.Label(dir_frame, text="保存目录：").pack(side=tk.LEFT, padx=self.padx)
         self.dir_var = tk.StringVar(value=self.download_dir)
         dir_entry = ttk.Entry(dir_frame, textvariable=self.dir_var)
         dir_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=self.pady)
@@ -553,7 +557,7 @@ class DownloadApp(tk.Tk):
         # 5. 进度条和标签
         self.progress_var = tk.DoubleVar()
         self.progress_label = ttk.Label(self.progress_frame, text="暂无下载内容")
-        self.progress_label.pack(fill=tk.X, pady=self.pady)
+        self.progress_label.pack(fill=tk.X, padx=self.padx, pady=self.pady)
 
         self.progress_bar = ttk.Progressbar(
             self.progress_frame, mode="determinate", variable=self.progress_var
@@ -674,7 +678,7 @@ def set_dpi_scale():
     return scale, os_name
 
 
-def set_theme(theme=None):
+def set_theme(theme=None, font_family=None, font_scale=1.0):
     import sv_ttk
     import darkdetect
 
@@ -682,11 +686,34 @@ def set_theme(theme=None):
         theme = darkdetect.theme()
     sv_ttk.set_theme(theme)
 
+    default_font = tkFont.nametofont("TkDefaultFont")
+    # windows: {'family': 'Microsoft YaHei UI', 'size': 9, 'weight': 'normal', 'slant': 'roman', 'underline': 0, 'overstrike': 0}
+    # macos: {'family': '.AppleSystemUIFont', 'size': 13, 'weight': 'normal', 'slant': 'roman', 'underline': 0, 'overstrike': 0}
+
+    family = font_family if font_family else default_font.actual("family")
+    # Update font: SunValley*Font: 12/14/.../68
+    parts = [
+        "Caption",
+        "Body",
+        "BodyStrong",
+        "BodyLarge",
+        "Subtitle",
+        "Title",
+        "TitleLarge",
+        "Display",
+    ]
+    for font_name in parts:
+        font = tkFont.nametofont(f"SunValley{font_name}Font")
+        # size = font.actual("size")
+        size = font.cget("size")
+        font.configure(size=int(size * font_scale))
+        font.configure(family=family)
+
 
 def main():
     scale, os_name = set_dpi_scale()
     app = DownloadApp(scale, os_name)
-    set_theme()
+    set_theme(font_scale=scale)
     app.eval("tk::PlaceWindow . center")
     app.mainloop()
 
