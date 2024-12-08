@@ -29,8 +29,8 @@ jobs:
 
       - name: Build app
         run: |
-          pyinstaller --onefile --add-data="src/icons:icons" --icon=icons/favicon2.ico --name=${{env.CLI_APP_NAME}}.exe src/app-cli.py
-          pyinstaller --onefile --add-data="src/icons:icons" --icon=icons/favicon2.ico --name=${{env.APP_NAME}}.exe --windowed src/app-tk.pyw
+          pyinstaller -F --name=${{env.CLI_APP_NAME}}.exe src/app-cli.py
+          pyinstaller -F --add-data="src/icons:icons" --icon=icons/favicon2.ico --name=${{env.APP_NAME}}.exe --windowed src/app-tk.pyw
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -61,8 +61,8 @@ jobs:
 
       - name: Build app
         run: |
-          pyinstaller --onefile --add-data="src/icons:icons" --icon=icons/favicon2.ico --name=mac-${{env.CLI_APP_NAME}} src/app-cli.py
-          pyinstaller --onefile --add-data="src/icons:icons" --icon=icons/favicon2.ico --name=mac-${{env.APP_NAME}} --windowed src/app-tk.pyw
+          pyinstaller -F --name=mac-${{env.CLI_APP_NAME}} src/app-cli.py
+          pyinstaller -F --add-data="src/icons:icons" --icon=icons/favicon2.ico --name=mac-${{env.APP_NAME}} --windowed src/app-tk.pyw
           pushd dist
           chmod +x mac-*-cli
           for app in mac-*.app; do
@@ -81,7 +81,7 @@ jobs:
             dist/mac-*.zip
 
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -99,7 +99,7 @@ jobs:
 
       - name: Build app
         run: |
-          pyinstaller --onefile --add-data="src/icons:icons" --icon=icons/favicon2.ico --name=linux-${{env.CLI_APP_NAME}} src/app-cli.py
+          pyinstaller -F --name=linux-${{env.CLI_APP_NAME}} src/app-cli.py
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
