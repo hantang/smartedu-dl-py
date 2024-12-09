@@ -21,24 +21,8 @@ from concurrent.futures import as_completed, ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
-import requests
-# from tqdm import tqdm
-
 from .utils import clean_dir, gen_filename2, get_headers
-
-
-def download_ts_file(url: str, output_path: str, headers: dict, timeout: int):
-    response = requests.get(url, headers=headers, timeout=timeout)
-    if response.ok:
-
-        # 检查文件大小
-        content_length = int(response.headers.get("content-length", 0))
-        if content_length == 0:
-            raise ValueError("Empty response")
-        with open(output_path, "wb") as f:
-            f.write(response.content)
-        return True
-    return False
+from .utils_dl import download_ts_file
 
 
 def download_ts_file2(
@@ -269,6 +253,7 @@ def download_m3u8(url: str, output_path: str = None, max_workers: int = 10) -> d
 
         # 解析m3u8文件
         import m3u8
+
         m3u8_obj = m3u8.load(url)
         if not m3u8_obj.segments:
             raise ValueError("No segments found in m3u8 file")

@@ -1,11 +1,25 @@
+import ctypes
+import platform
+import tkinter.font as tkFont
 
 import sv_ttk
 import darkdetect
-import tkinter.font as tkFont
 
 
-def set_theme(theme=None, font_family=None, font_scale=1.0):
-    if not theme or theme not in ["dark", "light"]:
+def set_dpi_scale():
+    scale = 1.0
+    os_name = platform.system()
+    if os_name == "Windows":
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        ScaleFactor = ctypes.windll.shcore.GetScaleFactorForDevice(0)
+        scale = ScaleFactor / 100.0
+    return scale, os_name
+
+
+def set_theme(theme="auto", font_family=None, font_scale=1.0):
+    if theme == "raw":
+        return
+    if theme == "auto":
         theme = darkdetect.theme()
     sv_ttk.set_theme(theme)
 
@@ -31,4 +45,3 @@ def set_theme(theme=None, font_family=None, font_scale=1.0):
         size = font.cget("size")
         font.configure(size=int(size * font_scale))
         font.configure(family=family)
-
