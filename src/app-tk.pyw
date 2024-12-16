@@ -54,124 +54,6 @@ def update_labels_wraplength(event, labels, scale=1.0, delta=20, frame=None):
         label.configure(wraplength=wraplength)
 
 
-class BookSelectorFrame(ttk.Frame):
-    """自定义选择框架"""
-
-    def __init__(self, parent, fonts, font_size, scale=1.0, os_name=None):
-        super().__init__(parent)
-
-        self.fonts = fonts
-        self.font_size = font_size
-        self.scale = scale
-        self.padx = int(5 * scale)
-        self.pady = int(5 * scale)
-        self.checkbox_height = int(100 * scale)
-
-        # 初始化属性
-        self.hier_dict = None
-        self.tag_dict = None
-        self.id_dict = None
-        self.frame_names = ["选择课本", "选择教材"]
-        self.level_hiers = []
-        self.level_options = []  # 下拉框数据，[id, name]
-
-        self.selected_items = set()  # 多选框选中的条目
-        # self.checkbox_list = []  # 多选框
-        # self.combobox_list = []  # 下拉框
-
-        self.pack(fill=tk.BOTH, expand=True)
-        # 创建左右两个部分
-        self.books_frame = ttk.LabelFrame(self, text=self.frame_names[0], padding=self.padx * 2)
-        self.books_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=self.padx)
-
-        self.hierarchy_frame = ttk.LabelFrame(self, text=self.frame_names[1], padding=self.padx * 2)
-        self.hierarchy_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=self.padx)
-
-        self.setup_books_frame()
-        self.setup_hierarchy_frame()
-
-    def setup_books_frame(self):
-        """设置课本部分"""
-        # 上半部分：多选框的frame（滚动条）
-        checkbox_frame = ttk.Frame(self.books_frame)
-        checkbox_frame.pack(fill=tk.BOTH, expand=True)
-
-        # 创建Canvas和Scrollbar
-        canvas = tk.Canvas(checkbox_frame, highlightthickness=0)
-        self.scrollbar = ttk.Scrollbar(checkbox_frame, orient="vertical", command=canvas.yview)
-        self.scrollable_frame = ttk.Frame(canvas)
-
-        # 绑定Canvas和Scrollbar
-        self.scrollable_frame.bind(
-            "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        canvas.create_window((self.padx, 0), window=self.scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=self.scrollbar.set)
-
-        # 设置最大高度
-        checkbox_frame.configure(height=self.checkbox_height)  # 设置最大高度
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        # 处理鼠标滚轮事件
-        canvas.bind_all(
-            "<MouseWheel>", lambda e: canvas.yview_scroll(-1 if e.delta > 0 else 1, "units")
-        )
-        # self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        # checkbox_frame.bind(
-        #     "<Configure>",
-        #     lambda e: update_labels_wraplength(
-        #         e,
-        #         [v[2] for v in self.checkbox_list],
-        #         self.scale,
-        #         int(60 * self.scale),
-        #         checkbox_frame,
-        #     ),
-        # )
-
-        # 下半部分：全选和取消全选按钮
-        btn_frame = ttk.Frame(self.books_frame)
-        btn_frame.pack(side=tk.BOTTOM, padx=self.padx)
-
-        self.select_all_btn = ttk.Button(btn_frame, text="全选")
-        self.deselect_all_btn = ttk.Button(btn_frame, text="清空")
-        self.select_all_btn.pack(side=tk.RIGHT, padx=self.padx)
-        self.deselect_all_btn.pack(side=tk.RIGHT, padx=self.padx)
-        self.select_all_btn.configure(state=tk.DISABLED)
-        self.deselect_all_btn.configure(state=tk.DISABLED)
-
-    def setup_hierarchy_frame(self):
-        """设置教材层级部分"""
-        # 上半部分：下拉框的frame
-        self.combo_frame = ttk.Frame(self.hierarchy_frame)
-        self.combo_frame.pack(fill=tk.BOTH)  # , expand=True
-
-        # 下半部分：查询按钮
-        query_btn_frame = ttk.Frame(self.hierarchy_frame)
-        query_btn_frame.pack(side=tk.BOTTOM, anchor="s")
-
-        self.query_btn = ttk.Button(query_btn_frame, text="查询", command=self.query_data)
-        self.query_btn.pack(side=tk.RIGHT)
-
-    def query_data(self):
-        """查询数据并更新下拉框"""
-        # 获取第一级数据
-        if self.hier_dict is None:
-            self.hierarchy_frame.configure(text="联网查询教材数据中……")
-            self.hier_dict, self.tag_dict, self.id_dict = fetch_metadata(None)
-
-        if self.hier_dict:
-            logging.debug(f"hier_dict = {len(self.hier_dict)}")
-            self.hierarchy_frame.configure(text="查询完成")
-            # self.hierarchy_frame.configure(text=self.frame_names[1])
-            # self.update_frame(0)
-        else:
-            # self.update_frame(-1, -1)
-            messagebox.showerror("错误", "获取数据失败，请稍后再试")
-
-    def get_selected_urls(self) -> list[str]:
-        """获取选中的URL列表"""
-        return gen_url_from_tags(list(self.selected_items))
-
-
 class InputURLAreaFrame(ttk.Frame):
     """手动输入面板"""
 
@@ -350,21 +232,21 @@ class DownloadApp(tk.Tk):
             variable=self.mode_var,
             command=self.switch_mode,
         )
-        radio1.pack(side=tk.LEFT, fill=tk.X, padx=self.padx * 2)
+        # radio1.pack(side=tk.LEFT, fill=tk.X, padx=self.padx * 2)
         radio2.pack(side=tk.LEFT, fill=tk.X, padx=self.padx * 2)
 
         # 4. 内容区域，包括两个面板，单选控制
         self.content_frame = ttk.Frame(main_frame)
         self.content_frame.pack(fill=tk.BOTH, expand=True)
-        self.selector_frame = BookSelectorFrame(
-            self.content_frame, self.fonts, self.font_size, self.scale, self.os_name
-        )
+        # self.selector_frame = BookSelectorFrame(
+        #     self.content_frame, self.fonts, self.font_size, self.scale, self.os_name
+        # )
         self.inputs_frame = InputURLAreaFrame(
             self.content_frame, self.fonts, self.font_size, self.scale, self.os_name
         )
 
         # 默认显示教材列表面板
-        self.selector_frame.pack(fill=tk.BOTH, expand=True, pady=self.pady * 2)
+        self.inputs_frame.pack(fill=tk.BOTH, expand=True, pady=self.pady * 2)
 
     def setup_control_frame(self, main_frame):
         # New: 资源类型选项
@@ -432,21 +314,21 @@ class DownloadApp(tk.Tk):
 
     def switch_mode(self):
         """切换模式"""
-        if self.mode_var.get() == self.frame_names[0]:
-            self.inputs_frame.pack_forget()
-            self.selector_frame.pack(fill=tk.BOTH, expand=True)
-        else:
-            self.selector_frame.pack_forget()
-            self.inputs_frame.pack(fill=tk.BOTH, expand=True)
-            self.inputs_frame.text.focus_set()  # 聚焦在输入框
+        # if self.mode_var.get() == self.frame_names[0]:
+        #     self.inputs_frame.pack_forget()
+        #     self.selector_frame.pack(fill=tk.BOTH, expand=True)
+        # else:
+        #     self.selector_frame.pack_forget()
+        self.inputs_frame.pack(fill=tk.BOTH, expand=True)
+        self.inputs_frame.text.focus_set()  # 聚焦在输入框
 
     def start_download(self):
         """开始下载"""
         # 获取URL列表
-        if self.mode_var.get() == self.frame_names[0]:
-            urls = self.selector_frame.get_selected_urls()
-        else:
-            urls = self.inputs_frame.get_urls()
+        # if self.mode_var.get() == self.frame_names[0]:
+        #     urls = self.selector_frame.get_selected_urls()
+        # else:
+        urls = self.inputs_frame.get_urls()
 
         if not urls:
             messagebox.showwarning("警告", "请先选择要下载的资源或输入链接")
