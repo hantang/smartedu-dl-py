@@ -160,11 +160,11 @@ class BookSelectorFrame(ttk.Frame):
 
         if self.hier_dict:
             logging.debug(f"hier_dict = {len(self.hier_dict)}")
-            self.hierarchy_frame.configure(text="查询完成")
+            # self.hierarchy_frame.configure(text="查询完成")
             self.hierarchy_frame.configure(text=self.frame_names[1])
-            self.update_frame(0)
+            # self.update_frame(0)
         else:
-            self.update_frame(-1, -1)
+            # self.update_frame(-1, -1)
             messagebox.showerror("错误", "获取数据失败，请稍后再试")
 
     def update_frame(self, index):
