@@ -76,8 +76,8 @@ class BookSelectorFrame(ttk.Frame):
         self.level_options = []  # 下拉框数据，[id, name]
 
         self.selected_items = set()  # 多选框选中的条目
-        self.checkbox_list = []  # 多选框
-        self.combobox_list = []  # 下拉框
+        # self.checkbox_list = []  # 多选框
+        # self.combobox_list = []  # 下拉框
 
         self.pack(fill=tk.BOTH, expand=True)
         # 创建左右两个部分
@@ -116,23 +116,23 @@ class BookSelectorFrame(ttk.Frame):
             "<MouseWheel>", lambda e: canvas.yview_scroll(-1 if e.delta > 0 else 1, "units")
         )
         # self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        checkbox_frame.bind(
-            "<Configure>",
-            lambda e: update_labels_wraplength(
-                e,
-                [v[2] for v in self.checkbox_list],
-                self.scale,
-                int(60 * self.scale),
-                checkbox_frame,
-            ),
-        )
+        # checkbox_frame.bind(
+        #     "<Configure>",
+        #     lambda e: update_labels_wraplength(
+        #         e,
+        #         [v[2] for v in self.checkbox_list],
+        #         self.scale,
+        #         int(60 * self.scale),
+        #         checkbox_frame,
+        #     ),
+        # )
 
         # 下半部分：全选和取消全选按钮
         btn_frame = ttk.Frame(self.books_frame)
         btn_frame.pack(side=tk.BOTTOM, padx=self.padx)
 
-        self.select_all_btn = ttk.Button(btn_frame, text="全选", command=self.select_all)
-        self.deselect_all_btn = ttk.Button(btn_frame, text="取消全选", command=self.deselect_all)
+        self.select_all_btn = ttk.Button(btn_frame, text="全选")
+        self.deselect_all_btn = ttk.Button(btn_frame, text="清空")
         self.select_all_btn.pack(side=tk.RIGHT, padx=self.padx)
         self.deselect_all_btn.pack(side=tk.RIGHT, padx=self.padx)
         self.select_all_btn.configure(state=tk.DISABLED)
@@ -160,162 +160,12 @@ class BookSelectorFrame(ttk.Frame):
 
         if self.hier_dict:
             logging.debug(f"hier_dict = {len(self.hier_dict)}")
-            # self.hierarchy_frame.configure(text="查询完成")
-            self.hierarchy_frame.configure(text=self.frame_names[1])
+            self.hierarchy_frame.configure(text="查询完成")
+            # self.hierarchy_frame.configure(text=self.frame_names[1])
             # self.update_frame(0)
         else:
             # self.update_frame(-1, -1)
             messagebox.showerror("错误", "获取数据失败，请稍后再试")
-
-    def update_frame(self, index):
-        """更新层级和课本"""
-        self._destroy_combobox(index)
-        self.update_checkbox(None)
-        self.level_options = []
-        self.level_hiers = []
-        if index < 0:
-            return
-
-        self.level_hiers = [self.hier_dict]
-        self.level_options = [()]
-        selected_key = self.hier_dict["next"][0]
-        _, name, options = self._query(selected_key)
-
-        # 创建第一个下拉框
-        self.create_combobox(0, name, options)
-
-    def create_combobox(self, index, name, options):
-        self._destroy_combobox(index + 1)
-        self.update_checkbox(None)
-
-        frame = ttk.Frame(self.combo_frame)
-        frame.pack(fill=tk.X, side=tk.TOP, expand=True, padx=self.padx, pady=self.pady)
-
-        level_count = len(self.level_options) - 1
-        label = ttk.Label(frame, text=f"{level_count}. 【{name}】", font=("bold",))
-        label.pack(fill=tk.X, expand=True, padx=self.padx * 2)
-
-        option_names = [op[1] for op in options]
-        cb = ttk.Combobox(frame, state="readonly", values=option_names, width=10)
-        cb.pack(fill=tk.X, expand=True, pady=self.pady)  #
-        cb.bind("<<ComboboxSelected>>", lambda e: self.on_combobox_select(index, cb.get()))
-
-        self.combobox_list.append([label, cb, frame])
-
-        if len(option_names) == 0:
-            self.hierarchy_frame.configure(text=f"{self.frame_names[1]}: {name} 数据为空")
-        else:
-            self.hierarchy_frame.configure(text=self.frame_names[1])
-
-    def on_combobox_select(self, index: int, value: str):
-        """处理选事件"""
-        logging.debug(f"on_combobox_select index={index}, value={value}")
-        self._destroy_combobox(index + 1)
-        self.update_checkbox(None)
-
-        # 查找选中项对应的key
-        selected_key = None
-        current_options = self.level_options[-1]
-        for key, name in current_options:
-            if name == value:
-                selected_key = key
-                break
-        logging.debug(f"selected_key = {selected_key}, current_options = {current_options}")
-
-        if selected_key:
-            level, name, options = self._query(selected_key)
-            # 创建多选框或者，下一级下拉框
-            if level == -1:
-                self.update_checkbox(options)
-            else:
-                self.create_combobox(index + 1, name, options)
-
-    def _query(self, key):
-        # 查询下一个下拉框数据
-        current_hier_dict = self.level_hiers[-1]
-        level, name, options = query_metadata(key, current_hier_dict, self.tag_dict, self.id_dict)
-        self.level_hiers.append(current_hier_dict[key])
-        self.level_options.append(options)
-
-        return level, name, options
-
-    def _destroy_combobox(self, index):
-        index2 = max(index, 0)
-        # 清除现有的下拉框和多选框
-        for widgets in self.combobox_list[index2:]:
-            for w in widgets:
-                w.destroy()
-        self.combobox_list = self.combobox_list[:index2]
-
-        self.level_hiers = self.level_hiers[: index2 + 1]
-        self.level_options = self.level_options[: index2 + 1]
-
-    def update_checkbox(self, options):
-        for widget in self.scrollable_frame.winfo_children():
-            widget.destroy()
-
-        self.checkbox_list = []
-        self.selected_items = set()
-        self.scrollbar.pack_forget()  # 隐藏滚动条
-        logging.debug(f"=>>> options = {options}")
-        if not options:
-            self.select_all_btn.configure(state=tk.DISABLED)
-            self.deselect_all_btn.configure(state=tk.DISABLED)
-            self.books_frame.configure(text=self.frame_names[0])
-            if options is not None and len(options) == 0:
-                self.books_frame.configure(text=f"{self.frame_names[0]}: 数据为空")
-            return
-
-        width = len(str(len(options)))
-        for i, (book_id, book_name) in enumerate(options):
-            var = tk.BooleanVar()
-            var.set(False)
-            frame = ttk.Frame(self.scrollable_frame)
-            frame.pack(fill=tk.X, side=tk.TOP, expand=True)
-            cb = ttk.Checkbutton(
-                frame,
-                variable=var,
-                command=lambda id=book_id: self.toggle_checkbox_selection(id),
-            )
-            # 使用label自动换行
-            label = ttk.Label(frame, text=f"{i + 1:0{width}d}. {book_name}")
-            cb.pack(side=tk.LEFT)
-            label.pack(side=tk.LEFT)
-            self.checkbox_list.append((var, cb, label))
-
-        if options:
-            self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-            self.select_all_btn.configure(state=tk.NORMAL)
-            self.deselect_all_btn.configure(state=tk.NORMAL)
-            self.books_frame.configure(text=f"{self.frame_names[0]}: 共 {len(options)} 项资源")
-
-    def toggle_checkbox_selection(self, book_id: str):
-        """切换选择状态"""
-        if book_id in self.selected_items:
-            self.selected_items.remove(book_id)
-        else:
-            self.selected_items.add(book_id)
-        n1 = len(self.level_options[-1])
-        n2 = len(self.selected_items)
-        self.books_frame.configure(text=f"{self.frame_names[0]}: 共 {n1} 项资源，已选 {n2} 项")
-
-    def select_all(self):
-        """全选"""
-        self.selected_items = set([op[0] for op in self.level_options[-1]])
-        for var in self.checkbox_list:
-            var[0].set(True)
-        n1 = len(self.level_options[-1])
-        n2 = len(self.selected_items)
-        self.books_frame.configure(text=f"{self.frame_names[0]}: 共 {n1} 项资源，已选 {n2} 项")
-
-    def deselect_all(self):
-        """取消全选"""
-        self.selected_items = set()
-        for var in self.checkbox_list:
-            var[0].set(False)
-        n1 = len(self.level_options[-1])
-        n2 = len(self.selected_items)
-        self.books_frame.configure(text=f"{self.frame_names[0]}: 共 {n1} 项资源，已选 {n2} 项")
 
     def get_selected_urls(self) -> list[str]:
         """获取选中的URL列表"""
