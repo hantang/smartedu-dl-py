@@ -32,7 +32,7 @@ ALL_KEY = "a"
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(filename)s [line:%(lineno)d] %(levelname)s %(message)s",
+    format="%(asctime)s %(filename)s %(levelname)s %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
@@ -177,7 +177,7 @@ def preprocess(list_file, urls):
     return urls
 
 
-def simple_download(urls, save_path, formats):
+def simple_download(urls, save_path, formats, auth=None):
     click.echo(
         f"\n共选择 {click.style(str(len(urls)), fg='yellow')} 项资源，"
         f"将保存到目录【{click.style(str(save_path), fg='yellow')} 】"
@@ -214,7 +214,7 @@ def simple_download(urls, save_path, formats):
         console=console,
     ) as progress:
         download_task = progress.add_task("正在下载文件...", total=total)
-        results = download_files(resource_dict, save_path)
+        results = download_files(resource_dict, save_path, auth=auth)
         progress.update(download_task, completed=total)
 
     # 显示统计信息
@@ -334,7 +334,7 @@ def _interactive_path(save_path, retry=3):
     return save_path
 
 
-def interactive_download(default_output: str, audio: bool):
+def interactive_download(default_output: str, audio: bool, auth: str = None):
     """交互式下载流程"""
 
     book_base = None
@@ -381,7 +381,7 @@ def interactive_download(default_output: str, audio: bool):
         save_path = _interactive_path(default_output)
 
         # 开始下载
-        simple_download(resource_urls, save_path, audio)
+        simple_download(resource_urls, save_path, audio, auth)
 
         # 询问是否继续
         if not click.confirm("\n是否继续下载?", default=True, show_default=True):
@@ -394,6 +394,9 @@ def interactive_download(default_output: str, audio: bool):
 @click.option("--debug", "-d", is_flag=True, help="启用调试模式")
 @click.option("--interactive", "-i", is_flag=True, help="交互模式（默认）")
 @click.option("--formats", "-t", help="下载资源类型，逗号分隔")
+@click.option(
+    "--auth", "-a", help="用户登录信息X-ND-AUTH字段；如果下载失败或非最新版教材，请配置这个"
+)
 @click.option("--urls", "-u", help="URL路径列表，逗号分隔")
 @click.option("--list_file", "-f", type=click.Path(exists=True), help="包含URL的文件")
 @click.option("--output", "-o", type=click.Path(), default=DEFAULT_PATH, help="下载文件保存目录")
@@ -401,6 +404,7 @@ def main(
     debug: bool,
     interactive: bool,
     formats: Optional[str],
+    auth: Optional[str],
     urls: Optional[str],
     list_file: Optional[str],
     output: str,
@@ -421,6 +425,10 @@ def main(
         formats = ["pdf"]
     logging.debug(f"formats = {formats}")
 
+    if auth:
+        auth = auth.strip()
+        logging.info(f"已配置了X-ND-AUTH = {auth}")
+
     try:
         if mode:
             # 非交互模式，直接下载预定义URL
@@ -428,10 +436,10 @@ def main(
             if not predefined_urls:
                 logger.error("没有提供有效的URL")
                 sys.exit(1)
-            simple_download(predefined_urls, output, formats)
+            simple_download(predefined_urls, output, formats, auth)
         else:
             # 默认改成交互模式
-            interactive_download(output, formats)
+            interactive_download(output, formats, auth)
             # logger.warning("请使用-u/-f提供URL列表，或使用-i进行交互")
 
     except Exception as e:

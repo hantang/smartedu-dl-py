@@ -49,13 +49,13 @@ def clean_dir(temp_dir):
         logging.warning(f"清理临时文件失败: {e}")
 
 
-def get_headers():
+def get_headers(auth=None):
     # ua = UserAgent(platforms=["pc", "desktop"])
 
-    headers = {
-        "User-Agent": random.choice(UserAgents),
-        "X-ND-AUTH": 'MAC id="0",nonce="0",mac="0"', # TODO 需要登录获取
-    }
+    headers = {"User-Agent": random.choice(UserAgents)}
+    # TODO 需要登录获取 'MAC id="0",nonce="0",mac="0"',
+    if auth and "mac id=" in auth.lower():
+        headers["X-ND-AUTH"] = auth
     return headers
 
 

@@ -7,7 +7,7 @@ from .utils import gen_filename, get_headers
 from .utils_dl import download_file, fetch_single_data
 
 
-def download_file2(url, name, save_dir, raw_url):
+def download_file2(url, name, save_dir, raw_url, auth=None):
     headers = get_headers()
     timeout = 10
     chunk_size = 16 * 1024  # 16k
@@ -17,7 +17,7 @@ def download_file2(url, name, save_dir, raw_url):
     return out
 
 
-def download_files(url_dict: dict, output_dir: str, max_workers: int = 5) -> list:
+def download_files(url_dict: dict, output_dir: str, max_workers: int = 5, auth: str = None) -> list:
     """并发下载多个文件"""
     save_dir = Path(output_dir)
     if not save_dir.exists():
@@ -26,7 +26,7 @@ def download_files(url_dict: dict, output_dir: str, max_workers: int = 5) -> lis
     results = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_url = {
-            executor.submit(download_file2, url, name, save_dir, raw_url): url
+            executor.submit(download_file2, url, name, save_dir, raw_url, auth): url
             for url, [name, raw_url] in url_dict.items()
         }
         for future in as_completed(future_to_url):
@@ -38,7 +38,12 @@ def download_files(url_dict: dict, output_dir: str, max_workers: int = 5) -> lis
 
 
 def download_files_tk(
-    app, url_dict: dict, output_dir: str, max_workers: int = 5, base_progress: int = 0
+    app,
+    url_dict: dict,
+    output_dir: str,
+    max_workers: int = 5,
+    base_progress: int = 0,
+    auth: str = None,
 ) -> list:
     """tk下载文件，更新进度条"""
     save_dir = Path(output_dir)
@@ -49,7 +54,7 @@ def download_files_tk(
     total = len(url_dict)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_url = {
-            executor.submit(download_file2, url, name, save_dir, raw_url): url
+            executor.submit(download_file2, url, name, save_dir, raw_url, auth): url
             for url, [name, raw_url] in url_dict.items()
         }
         for future in as_completed(future_to_url):
