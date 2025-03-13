@@ -4,6 +4,7 @@ smartedu配置信息和解析
 
 import logging
 import random
+
 from urllib.parse import parse_qs, urlparse
 
 SERVER_LIST = [
@@ -241,7 +242,12 @@ RESOURCE_DICT = {
 
 def _clean_url(resource_url):
     # https://r1-ndr-private.ykt.cbern.com.cn -> https://r1-ndr.ykt.cbern.com.cn
-    return resource_url.replace("ndr-private.", "ndr.")
+    logging.debug(f"Raw URL = {resource_url}")
+    new_url = resource_url.replace("ndr-doc-private.", "ndr.")
+    new_url = "/".join(new_url.split("/")[:-1] + ["pdf.pdf"])
+    logging.debug(f"New URL = {new_url}")
+
+    return new_url
 
 
 def validate_url(url: str):

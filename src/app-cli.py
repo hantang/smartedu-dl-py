@@ -21,7 +21,7 @@ from tools.logo import DESCRIBES, LOGO_TEXT2
 
 
 DEFAULT_URLS = []
-DATA_PATH = None
+DATA_PATH = "data"
 DEFAULT_PATH = "./downloads"
 EXIT_KEY = "exit"
 ZERO_KEY = "0"
@@ -207,11 +207,11 @@ def simple_download(urls, save_path, formats):
 
     # 下载文件
     with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            console=console,
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
     ) as progress:
         download_task = progress.add_task("正在下载文件...", total=total)
         results = download_files(resource_dict, save_path)
@@ -222,50 +222,28 @@ def simple_download(urls, save_path, formats):
     display_results(console, results, elapsed_time)
 
 
-def _interactive_mode1(hier_dict, tag_dict, id_dict, retry=3):
-    def _query(key):
-        # 查询下一个下拉框数据
-        current_hier_dict = level_hiers[-1]
-        level, name, options = query_metadata(key, current_hier_dict, tag_dict, id_dict)
-        level_records[-1][2] = name
-        return level, name, options
-
-    level_hiers = [hier_dict]
-    level_options = [()]
-    level_records = [[hier_dict["next"][0], "", ""]]  # (key, option, name)
+def _interactive_mode1(book_base, retry=3):
+    book_history = [book_base.children[0]]
     options = []
     urls_to_process = []
     flag = True
+
     while flag:
-        last_name = level_records[-2][2] if len(level_records) > 1 else ""
-        selected_key, selected_option = level_records[-1][:2]
-        level, name, options = _query(selected_key)
-
-        if len(options) == 0:
-            note = f"【{last_name}】为“{selected_option}”"
-            click.secho(f"\n当前选择的{note}没有候选，请重选", fg="red")
-            count = 0
-            # 只有单一选项且候选为空都返回
-            while len(level_options) > 1 and len(level_options[-1]) <= 1:
-                count += 1
-                for v in [level_hiers, level_options, level_records]:
-                    v.pop()
-            if len(level_options) > 1:
-                count += 1
-                for v in [level_hiers, level_options, level_records]:
-                    v.pop()
-
-            click.echo(f"将回退{count}级到【{level_records[-1][2]}】")
-            continue
-        elif level == -1:
+        current_book = book_history[-1]
+        step = current_book.level
+        title, options, children, is_book = query_metadata(current_book)
+        if step > 1 and is_book:
             break
+        if step > 1 and len(children) == 0:
+            click.secho(f"当前教材为空，返回上级菜单", fg="blue")
+            book_history.pop()
+            continue
 
-        step = len(level_options)
         note = "，输入0返回上一级" if step > 1 else ""
-        note_title = f"{step}. 请选择以下{last_name}某项（共{len(options)}项{note}）"
+        note_title = f"{step}. 请选择以下{title}中的某项（共{len(options)}项{note}）"
         option_names = [op[1] for op in options]
         for i in range(retry):
-            display_entries(option_names, note_title, name)
+            display_entries(option_names, note_title, title)
             selected_index = click.prompt("请选择", default=FIRST_KEY, show_default=True)
             selected_index = selected_index.strip().lower()
 
@@ -275,30 +253,29 @@ def _interactive_mode1(hier_dict, tag_dict, id_dict, retry=3):
 
             if step > 1 and selected_index == ZERO_KEY:
                 click.secho(f"输入为「{ZERO_KEY}」，返回上级菜单", fg="blue")
-                for v in [level_hiers, level_options, level_records]:
-                    v.pop()
+                book_history.pop()
                 break
 
             if selected_index.isdigit() and 1 <= int(selected_index) <= len(options):
                 # 更新到下一级
-                level_hiers.append(level_hiers[-1][selected_key])
-                level_options.append(options)
-                level_records.append(options[int(selected_index) - 1] + [""])
+                selected_index_val = int(selected_index) - 1
+                book_history.append(children[selected_index_val])
                 break
             else:
                 click.secho(f"输入不合法，请重新输入（第{i + 1}/{retry}次）", fg="red")
         else:
             logging.debug("错误次数过多，重置")
-            options = []
-            flag = False
+            book_history = [book_base.children[0]]
 
     if options:
-        name2 = name if name else "课本"
-        selected_option = level_records[-1][1]
+        name2 = title if title else "课本"
+        # selected_option = history_stack[-1]["caption"]
+        selected_option = "XX"
         option_names = [op[1] for op in options]
         note_title = f"当前选择的【{selected_option}】共{len(options)}项，如下"
         display_entries(option_names, note_title, name2)
         urls_to_process = gen_url_from_tags([cid for cid, _ in options])
+
     return urls_to_process
 
 
@@ -360,7 +337,7 @@ def _interactive_path(save_path, retry=3):
 def interactive_download(default_output: str, audio: bool):
     """交互式下载流程"""
 
-    hier_dict, tag_dict, id_dict = None, None, None
+    book_base = None
     mode_options = [
         ["1", "查询教材列表"],
         ["2", "手动输入URL"],
@@ -381,14 +358,14 @@ def interactive_download(default_output: str, audio: bool):
         # 获取URL列表
         urls_to_process = []
         if choice == choice_values[0]:
-            if hier_dict is None:
+            if book_base is None:
                 click.echo("\n联网查询教材数据中……")
                 data_dir = DATA_PATH
-                hier_dict, tag_dict, id_dict = fetch_metadata(data_dir)
-            if hier_dict is None:
+                book_base = fetch_metadata(data_dir)
+            if book_base is None or len(book_base.children) == 0:
                 click.secho("获取数据失败，请稍后再试", fg="red")
                 continue
-            urls_to_process = _interactive_mode1(hier_dict, tag_dict, id_dict)
+            urls_to_process = _interactive_mode1(book_base)
         elif choice == choice_values[1]:
             urls_to_process = _interactive_mode2()
 
@@ -421,12 +398,12 @@ def interactive_download(default_output: str, audio: bool):
 @click.option("--list_file", "-f", type=click.Path(exists=True), help="包含URL的文件")
 @click.option("--output", "-o", type=click.Path(), default=DEFAULT_PATH, help="下载文件保存目录")
 def main(
-        debug: bool,
-        interactive: bool,
-        formats: Optional[str],
-        urls: Optional[str],
-        list_file: Optional[str],
-        output: str,
+    debug: bool,
+    interactive: bool,
+    formats: Optional[str],
+    urls: Optional[str],
+    list_file: Optional[str],
+    output: str,
 ):
     # 如果是请求帮助信息，不需要显示欢迎信息
     if any(arg in sys.argv[1:] for arg in ["-h", "--help"]):

@@ -9,6 +9,7 @@ from pathlib import Path
 from .downloader import fetch_single_data
 from .parser import RESOURCE_DICT
 from .utils import get_headers
+from .books import BookItem, BookPDF
 
 
 def _traverse_tag_path(data):
@@ -48,7 +49,7 @@ def _parse_tag_hiers(data, level):
         next_paths = [v for v in next_paths if v not in hier["ext"]["hidden_tags"]]
         out["level"] = level
         out["name"] = name
-        out["next"] = next_paths
+        out["children"] = next_paths
         for i, child in enumerate(children):
             tag_id, tag_name = child["tag_id"], child["tag_name"]
             result = _parse_tag_hiers(child, level + 1)
@@ -138,64 +139,126 @@ def _fetch_raw_local(name, data_dir):
     return tag_data, parts_data
 
 
-def fetch_metadata(data_dir=None):
+def _parse_hierarchies(level, tag_item, tag_dict):
+    hierarchies = tag_item.get("hierarchies")
+    tag_id = tag_item["tag_id"]
+    tag_name = tag_item["tag_name"]
+    # assert tag_name == tag_dict[tag_id], (tag_name, tag_dict[tag_id])
+
+    if hierarchies is None:
+        bookItem = BookItem(level, "-", tag_id, tag_name)
+        return bookItem
+
+    hierarchy = hierarchies[0]
+    children = hierarchy["children"]
+    bookItem = BookItem(level, hierarchy["hierarchy_name"], tag_id, tag_name)
+
+    if len(children) > 0:
+        for child in children:
+            childBook = _parse_hierarchies(level + 1, child, tag_dict)
+            bookItem.add_child(childBook)
+
+    return bookItem
+
+
+def _update_hierarchies(book_base: BookItem, tag_dict: dict, doc_list: list[BookPDF]):
+    for bookPDF in doc_list:
+        # logging.info(f"bookPDF = {bookPDF.tag_path} {bookPDF.book_name}")
+        tag_paths = bookPDF.tag_path.split("/")
+
+        prev_item = book_base
+        current_item = book_base
+        if tag_paths[0] != book_base.tag_id:
+            continue
+
+        for i in range(1, len(tag_paths)):
+            current_tag_id = tag_paths[i]
+            prev_item = current_item
+
+            # current_item = None
+            flag = False
+            if prev_item is not None:
+                for j, item in enumerate(prev_item.children):
+                    if item.tag_id == current_tag_id:
+                        current_item = prev_item.children[j]
+                        flag = True
+                        break
+            # logging.info(f"{i}, current_tag_id = {current_tag_id} / current_item={current_item.level}/{current_item.tag_name}")
+            if flag:
+                continue
+
+            name = tag_dict[current_tag_id]
+            new_book_item = BookItem(prev_item.level + 1, name, current_tag_id, name)
+            new_book_item.set_book(bookPDF.book_id, bookPDF.book_name)
+            prev_item.add_child(new_book_item)
+    return book_base
+
+
+def fetch_metadata(data_dir=None, local=False):
     # 生成教材层级结构以及对应书名、ID等
     name = "/tchMaterial"  # TODO 目前仅教材，待支持课件
-    tag_data = None
-    logging.debug("Fetch online data")
-    tag_data, parts_data = _fetch_raw(name)
+
+    tag_data, parts_data = None, None
+    if not local:
+        logging.debug(f"Fetch online data")
+        tag_data, parts_data = _fetch_raw(name)
+
     if not tag_data and data_dir:
         logging.debug("Fetch local data")
         tag_data, parts_data = _fetch_raw_local(name, data_dir)
+
     if not tag_data:
-        return None, None, None
+        return None
+
+    tag_dict = {}
+    doc_list = []
+    for e in parts_data:
+        for tag in e["tag_list"]:
+            tag_id = tag["tag_id"]
+            if tag_id not in tag_dict:
+                tag_dict[tag_id] = tag["tag_name"]
+
+        for tag_path in e["tag_paths"]:
+            tag_id = tag_path.split("/")[-1]
+            bookPDF = BookPDF(e["id"], e["title"], tag_path, tag_id)
+            doc_list.append(bookPDF)
+
+    tag_base = tag_data["hierarchies"][0]
+    tag_items = tag_base["children"][0]
 
     # 专题*/电子教材
-    hier_dict = _parse_tag_hiers(tag_data, level=1)
-    tag_dict = _parse_tag_dict(tag_data)
-    hier_tags_title = {}
-    hier_tags_id = {}
-    for e in parts_data:
-        for tp in e["tag_paths"]:
-            tp_list = tp.strip().split("/")
-            k2 = tp_list[-1].strip()
-            tmp_hier_dict = hier_dict
-            for k in tp_list[1:]:
-                if k not in tmp_hier_dict:
-                    break
-                tmp_hier_dict = tmp_hier_dict[k]
-            if "list" in tmp_hier_dict and k2 not in tmp_hier_dict["list"]:
-                tmp_hier_dict["list"].append(k2)
-            if k2:
-                hier_tags_title[k2] = e["title"]
-                hier_tags_id[k2] = e["id"]  # contentId
-
-    logging.debug(f"hier_tags_title = {len(hier_tags_title)}")
-    logging.debug(f"tag_dict = {len(tag_dict)}")
-    logging.debug(f"hier_tags_id = {len(hier_tags_id)}")
-    tag_dict.update(hier_tags_title)
-
-    return hier_dict, tag_dict, hier_tags_id
+    book_item = _parse_hierarchies(1, tag_items, tag_dict)
+    book_base = BookItem(
+        0, tag_base["hierarchy_name"], tag_data["tag_path"], tag_base["hierarchy_name"]
+    )
+    book_base.add_child(book_item)
+    book_base = _update_hierarchies(book_base, tag_dict, doc_list)
+    return book_base
 
 
-def query_metadata(key, hier_dict, tag_dict, id_dict):
+def query_metadata(book_item: BookItem, max_level: int = 5):
     # 获得下一级列表
-    data = hier_dict[key]
-
-    options = []
-    if "next" in data:
-        level = data["level"]
-        name = data["name"]
-        for k in data["next"]:
-            if k and k in data:
-                options.append([k, data[k]["tag"]])
+    title = book_item.name
+    children = book_item.children
+    is_book = False
+    book_options = []
+    if len(children) > 0 and children[0].is_book:
+        for child in children:
+            tag_name = "《{}》".format(child.book_name.replace("•", "·"))
+            book_options.append((child.book_id, tag_name))
+        children = []
+        is_book = True
     else:
-        level = -1
-        name = "课本分册"
-        for k in data["list"]:
-            if k and k in tag_dict and k in id_dict:
-                options.append([id_dict[k], tag_dict[k]])
-    return level, name, options
+        for child in children:
+            tag_name = child.tag_name.replace("•", "·")
+            tag_name = tag_name.replace(" ", "")
+            book_options.append((child.tag_id, tag_name))
+
+    # if book_item.is_book or book_item.level >= max_level:
+    option_names = [opt[1] for opt in book_options]
+    logging.info(f"{book_item.level}, {is_book}, options = {option_names}")
+
+    return title, book_options, children, is_book
 
 
 def gen_url_from_tags(content_id_list):

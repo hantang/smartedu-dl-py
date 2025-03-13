@@ -52,7 +52,10 @@ def clean_dir(temp_dir):
 def get_headers():
     # ua = UserAgent(platforms=["pc", "desktop"])
 
-    headers = {"User-Agent": random.choice(UserAgents)}
+    headers = {
+        "User-Agent": random.choice(UserAgents),
+        "X-ND-AUTH": 'MAC id="0",nonce="0",mac="0"', # TODO 需要登录获取
+    }
     return headers
 
 

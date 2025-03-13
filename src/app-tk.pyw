@@ -12,7 +12,6 @@ from tkinter import filedialog, messagebox, ttk
 
 from tools.downloader import download_files_tk, fetch_all_data
 from tools.parser import extract_resource_url, parse_urls
-from tools.parser2 import fetch_metadata, gen_url_from_tags, query_metadata
 from tools.utils import base64_to_image
 from tools.theme import set_theme, set_dpi_scale
 from tools.parser import RESOURCE_DICT

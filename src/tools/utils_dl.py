@@ -38,9 +38,14 @@ def download_file(url: str, headers: dict, timeout: int, chunk_size: int, file_p
             # response.raise_for_status()
             logging.debug(f"download url = {url}, status = {response.status_code}")
             out["code"] = response.status_code
-            if response.ok:
-                total_size = int(response.headers.get("content-length", 0))
+            total_size = 0
 
+            if not response.ok:
+                out["size"] = total_size
+                out["status"] = "failed"
+                return out
+
+            total_size = int(response.headers.get("content-length", 0))
             with open(file_path, "wb") as file:
                 for data in response.iter_content(chunk_size=chunk_size):
                     file.write(data)
