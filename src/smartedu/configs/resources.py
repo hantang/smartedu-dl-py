@@ -72,7 +72,11 @@ RESOURCE_DICT = {
             # 课本PDF
             "default": "https://{server}.ykt.cbern.com.cn/zxx/ndrv2/resources/tch_material/details/{contentId}.json",
             # 备用 旧版本
-            "backup": "https://{server}.ykt.cbern.com.cn/zxx/ndrs/resources/tch_material/details/{contentId}.json",
+            "backup": [
+                "https://{server}.ykt.cbern.com.cn/zxx/ndrs/resources/tch_material/details/{contentId}.json",
+                "https://{server}.ykt.cbern.com.cn/zxx/ndrs/special_edu/resources/details/{contentId}.json",
+				"https://{server}.ykt.cbern.com.cn/zxx/ndrs/special_edu/thematic_course/{contentId}/resources/list.json",
+            ],
             # 配套音频
             "audio": "https://{server}.ykt.cbern.com.cn/zxx/ndrs/resources/{contentId}/relation_audios.json",
         },

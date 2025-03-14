@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urlparse
 from .configs.resources import DOMAIN_REMAP_DICT, RESOURCE_TYPE_DICT, RESOURCE_DICT
 from .configs.resources import FORMATS_REMAP, ACCEPTED_FORMATS, SERVER_LIST
 
+
 def _clean_url(resource_url):
     # https://r1-ndr-private.ykt.cbern.com.cn -> https://r1-ndr.ykt.cbern.com.cn
     logging.debug(f"Raw URL = {resource_url}")
@@ -38,11 +39,12 @@ def validate_url(url: str):
     return parse_result
 
 
-def parse_urls(urls: list, formats: list) -> list:
+def parse_urls(urls: list, formats: list, activate_backup: bool) -> list:
     # 根据URL路径判断资源类型，获得临时的配置信息URL(config, 返回json数据)，再解析得到最终资源URL
     config_urls = []
     config_key = "default"
     config_key2 = "audio"
+    config_key3 = "backup"
     audio = False
     for v in formats:
         if v.strip().lower() in RESOURCE_TYPE_DICT["assets_audio"][1]:
@@ -69,6 +71,11 @@ def parse_urls(urls: list, formats: list) -> list:
 
         config_url = config_info["resources"][config_key].format(**params_out)
         config_urls.append(config_url)
+        if activate_backup:
+            backup_urls = config_info["resources"][config_key3]
+            backup_urls = [backup_url.format(**params_out) for backup_url in backup_urls]
+            logging.debug(f"backup links = {backup_urls}")
+            config_urls.extend(backup_urls)
 
         if audio and config_key2 in config_info["resources"]:
             audio_url = config_info["resources"][config_key2].format(**params_out)
@@ -129,3 +136,12 @@ def gen_url_from_tags(content_id_list):
     example_url = resources["detail"]
     urls = [example_url.format(contentId=cid) for cid in content_id_list]
     return urls
+
+
+def get_formats(formats):
+    out = []
+    if formats:
+        out = [v.strp() for v in formats.strip(",") if v.strip() in ACCEPTED_FORMATS]
+    if len(out) == 0:
+        out = ["pdf"]
+    return out

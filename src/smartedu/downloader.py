@@ -9,7 +9,7 @@ from .utils.misc import get_headers
 
 
 def _download_file(url, name, save_dir, raw_url, auth=None) -> dict:
-    headers = get_headers()
+    headers = get_headers(auth)
     timeout = 10
     chunk_size = 16 * 1024  # 16k
     file_path = gen_filename(url, name, save_dir)

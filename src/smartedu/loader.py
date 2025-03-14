@@ -115,7 +115,7 @@ def update_hierarchies(tag_hier: TagHierarchy, tag_dict: dict, book_list: list[B
                         current_item = prev_item.children[j]
                         flag = True
                         break
-            # logging.info(f"{i}, current_tag_id = {current_tag_id} / current_item={current_item.level}/{current_item.tag_name}")
+
             if flag:
                 continue
 
@@ -123,6 +123,7 @@ def update_hierarchies(tag_hier: TagHierarchy, tag_dict: dict, book_list: list[B
             new_tag = TagHierarchy(prev_item.level + 1, name, current_tag_id, name)
             new_tag.set_book(book_item)
             prev_item.add_child(new_tag)
+
     return tag_hier
 
 
@@ -144,9 +145,10 @@ def fetch_metadata(data_dir=None, local=False):
         return None
 
     parts_data = [line for _, entry in version_data[2][1] for line in entry]
+    logging.debug(f"parts_data = {len(parts_data)}")
+
     tag_dict = {}
     book_list = []
-    logging.info(f"parts_data = {len(parts_data)}")
     for e in parts_data:
         for tag in e["tag_list"]:
             tag_id = tag["tag_id"]

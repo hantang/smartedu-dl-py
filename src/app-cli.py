@@ -4,13 +4,15 @@
 
 import logging
 import sys
-from pathlib import Path
 from typing import Optional
 
 import click
 
 from smartedu.configs.conf import DEFAULT_PATH, DATA_PATH
-from smartedu.ui.cli import display_welcome, preprocess, simple_download, interactive_download
+from smartedu.ui.cli import display_welcome, display_info, preprocess
+from smartedu.ui.cli import simple_download, interactive_download
+from smartedu.parser import get_formats
+
 
 # 配置日志
 logging.basicConfig(
@@ -27,6 +29,7 @@ logger = logging.getLogger(__name__)
 @click.option("--interactive", "-i", is_flag=True, help="交互模式（默认）")
 @click.option("--formats", "-t", help="下载资源类型，逗号分隔")
 @click.option("--auth", "-a", help="用户登录信息X-ND-AUTH字段；当下载失败或非最新版教材时配置")
+@click.option("--backup", "-b", is_flag=True, help="尝试用备用链接下载")
 @click.option("--urls", "-u", help="URL路径列表，逗号分隔")
 @click.option("--file", "-f", type=click.Path(exists=True), help="包含URL的文件")
 @click.option("--output", "-o", type=click.Path(), default=DEFAULT_PATH, help="下载文件保存目录")
@@ -35,6 +38,7 @@ def main(
     interactive: bool,
     formats: Optional[str],
     auth: Optional[str],
+    backup: bool,
     urls: Optional[str],
     file: Optional[str],
     output: str,
@@ -49,15 +53,21 @@ def main(
 
     mode = (urls or file) and (not interactive)
     display_welcome(not mode)
-    if formats:
-        formats = formats.split(",")
-    else:
-        formats = ["pdf"]
-    logging.debug(f"formats = {formats}")
-
+    formats = get_formats(formats)
     if auth:
         auth = auth.strip()
-        logging.info(f"已配置了X-ND-AUTH = {auth}")
+
+    info = {
+        "下载资源类型": formats,
+        "登录参数（X-ND-AUTH）": auth,
+        "启用备用链接": backup,
+        "默认保存路径": output,
+    }
+    display_info(info)
+
+    if urls or file:
+        info = {"下载链接": urls, "链接文件": file}
+        display_info(info, title="手动指定链接：")
 
     try:
         if mode:
@@ -69,7 +79,7 @@ def main(
             simple_download(predefined_urls, output, formats, auth)
         else:
             # 默认改成交互模式
-            interactive_download(output, formats, auth, data_dir=DATA_PATH)
+            interactive_download(output, formats, auth, backup, data_dir=DATA_PATH)
             # logger.warning("请使用-u/-f提供URL列表，或使用-i进行交互")
 
     except Exception as e:

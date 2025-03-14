@@ -2,7 +2,6 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Optional, Tuple
 
 import click
 from rich.console import Console
@@ -27,6 +26,17 @@ def display_welcome(is_interactive=False):
     click.secho(f"=== {DESCRIBES[0]} ===", fg="blue", bold=True)
     click.echo(f"> {DESCRIBES[1]}")
     click.echo(f"> {DESCRIBES[2]}\n")
+
+
+def display_info(info, title=None, sep=" "):
+    if title is None:
+        title = "配置参数如下："
+    click.secho(title, fg="yellow")
+    for k, v in info.items():
+        if v:
+            if isinstance(v, list):
+                v = sep.join(v)
+            click.echo(f"- {k}: {v}")
 
 
 def parse_range(range_str: str, max_num: int, min_num: int = 1) -> list:
@@ -56,7 +66,7 @@ def parse_range(range_str: str, max_num: int, min_num: int = 1) -> list:
     return sorted(list(result))
 
 
-def validate_save_path(path_str: str) -> Tuple[bool, str]:
+def validate_save_path(path_str: str) -> tuple[bool, str]:
     """验证保存路径"""
     try:
         path = Path(path_str).resolve()
@@ -158,13 +168,13 @@ def preprocess(list_file, urls):
     return urls
 
 
-def simple_download(urls, save_path, formats, auth=None):
+def simple_download(urls, save_path, formats, auth=None, activate_backup=False):
     click.echo(
         f"\n共选择 {click.style(str(len(urls)), fg='yellow')} 项资源，"
         f"将保存到目录【{click.style(str(save_path), fg='yellow')} 】"
     )
 
-    config_urls = parse_urls(urls, formats)
+    config_urls = parse_urls(urls, formats, activate_backup)
     resource_dict = fetch_resources(config_urls, lambda data: extract_resource_url(data, formats))
     total = len(resource_dict)
 
@@ -173,8 +183,11 @@ def simple_download(urls, save_path, formats, auth=None):
         f"\n解析得配置链接共 {click.style(str(len(config_urls)), fg='yellow')} 个；"
         f"\n最终的资源文件共 {click.style(str(total), fg='yellow')} 个。"
     )
-    for u in config_urls:
-        logging.info(u)
+
+    logger.debug("config_urls:")
+    for i, url in enumerate(config_urls):
+        logger.debug(f"{i+1}. {url}")
+
     if total == 0:
         click.echo("\n没有找到资源文件（PDF/MP3等）。结束下载")
         return
@@ -314,7 +327,13 @@ def _interactive_path(save_path, retry=3):
     return save_path
 
 
-def interactive_download(default_output: str, audio: bool, auth: str = None, data_dir: str = None):
+def interactive_download(
+    default_output: str,
+    audio: bool,
+    auth: str = None,
+    activate_backup: bool = False,
+    data_dir: str = None,
+):
     """交互式下载流程"""
 
     book_base = None
@@ -360,7 +379,7 @@ def interactive_download(default_output: str, audio: bool, auth: str = None, dat
         save_path = _interactive_path(default_output)
 
         # 开始下载
-        simple_download(resource_urls, save_path, audio, auth)
+        simple_download(resource_urls, save_path, audio, auth, activate_backup)
 
         # 询问是否继续
         if not click.confirm("\n是否继续下载?", default=True, show_default=True):
