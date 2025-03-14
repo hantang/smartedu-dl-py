@@ -171,4 +171,4 @@ temp/
 downloads/
 
 # temp
-*.json
+# *.json
