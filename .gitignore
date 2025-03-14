@@ -167,12 +167,8 @@ cython_debug/
 .idea/
 
 # more
-back/
 temp/
-todo/
-trash/
+downloads/
 
 # temp
 *.json
-downloads/
-images/
