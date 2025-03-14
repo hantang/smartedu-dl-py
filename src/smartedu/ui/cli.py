@@ -1,0 +1,368 @@
+import logging
+import sys
+import time
+from pathlib import Path
+from typing import Optional, Tuple
+
+import click
+from rich.console import Console
+from rich.progress import BarColumn, SpinnerColumn, TaskProgressColumn, TextColumn
+from rich.progress import Progress
+from rich.table import Table
+
+from ..configs.conf import ZERO_KEY, ALL_KEY, EXIT_KEY, FIRST_KEY
+from ..configs.logo import DESCRIBES, LOGO_TEXT2
+from ..downloader import download_files, fetch_resources
+from ..loader import fetch_metadata, query_metadata
+from ..parser import extract_resource_url, parse_urls, validate_url, gen_url_from_tags
+
+logger = logging.getLogger(__name__)
+
+
+def display_welcome(is_interactive=False):
+    """显示欢迎信息"""
+    if is_interactive:
+        click.clear()
+        click.echo(LOGO_TEXT2)
+    click.secho(f"=== {DESCRIBES[0]} ===", fg="blue", bold=True)
+    click.echo(f"> {DESCRIBES[1]}")
+    click.echo(f"> {DESCRIBES[2]}\n")
+
+
+def parse_range(range_str: str, max_num: int, min_num: int = 1) -> list:
+    """解析范围表达式，如 "1-3,5,7-9" """
+    range_str = range_str.strip().lower()
+    if range_str in ["a", "all"]:
+        return list(range(min_num, max_num + 1))
+
+    result = set()
+    for part in range_str.split(","):
+        part = part.strip()
+        if "-" in part and not part.startswith("-"):
+            start, end = map(str.strip, part.split("-"))
+            if not (start.isdigit() and end.isdigit()):
+                continue
+            start, end = int(start), int(end)
+            start = max(start, min_num)
+            end = min(end, max_num)
+            if min_num <= start <= end <= max_num:
+                result.update(range(start, end + 1))
+        else:
+            if not part.isdigit():
+                continue
+            num = int(part)
+            if min_num <= num <= max_num:
+                result.add(num)
+    return sorted(list(result))
+
+
+def validate_save_path(path_str: str) -> Tuple[bool, str]:
+    """验证保存路径"""
+    try:
+        path = Path(path_str).resolve()
+        logging.debug(f"mkdir {path}")
+        path.mkdir(parents=True, exist_ok=True)
+        return True, str(path)
+    except Exception:
+        return False, None
+
+
+def display_entries(data: list, title: str = "URL列表", title2: str = None):
+    """显示URL列表"""
+    width = len(str(len(data)))
+    if title2:
+        click.secho(f"\n{title}：", bold=True)
+        click.secho(" " * (width + 2) + f"【{title2}】", fg="yellow")
+    else:
+        click.secho(f"\n{title}：", fg="yellow")
+
+    for i, value in enumerate(data, 1):
+        if isinstance(value, str):
+            click.echo(f"{click.style(f'[{i:>{width}d}]', bold=True, fg='blue')} {value}")
+        else:
+            v1, v2 = value
+            click.echo(f"{click.style(f'[{v1}]', bold=True, fg='blue')} {v2}")
+
+
+def display_results(console: Console, results: list, elapsed_time: float):
+    """展示下载结果统计"""
+    # 创建总体统计表格
+    summary_table = Table(title="下载统计", show_header=False, title_style="bold yellow")
+    success_count = sum(1 for r in results if r["status"] == "success")
+    failed_count = len(results) - success_count
+
+    summary_table.add_row("总计文件", str(len(results)))
+    summary_table.add_row("成功下载", f"[green]{success_count}[/green]")
+    summary_table.add_row("下载失败", f"[red]{failed_count}[/red]")
+    summary_table.add_row("总计用时", f"{elapsed_time:.2f}秒")
+
+    console.print("\n")
+    console.print(summary_table)
+
+    # 创建详细结果表格
+    if results:
+        result_table = Table(title="\n下载详情", title_style="bold yellow")
+        result_table.add_column("序号", justify="right")
+        result_table.add_column("URL", justify="left", no_wrap=False)
+        result_table.add_column("状态", justify="center")
+        result_table.add_column("存储", justify="left", no_wrap=False)
+
+        for i, res in enumerate(results, 1):
+            # status_style = "green" if res["status"] == "success" else "red"
+            status = (
+                f"[green]成功（{res['code']}）[/green]"
+                if res["status"] == "success"
+                else f"[red]失败（{res['code']}）[/red]"
+            )
+            file_path = res.get("file", "---")
+            url = res.get("raw", res["url"])
+            result_table.add_row(str(i), url, status, file_path)
+        console.print(result_table)
+
+
+def display_stats(console: Console, resource_dict: dict):
+    suffix_stats = {}
+    for url, [name, raw_url] in resource_dict.items():
+        suffix = name.split(".")[-1]
+        if suffix not in suffix_stats:
+            suffix_stats[suffix] = 0
+        suffix_stats[suffix] += 1
+    suffix_stats = sorted(suffix_stats.items(), key=lambda x: x[1], reverse=True)
+
+    result_table = Table(title="\n待下载资源", title_style="bold yellow")
+    result_table.add_column("序号", justify="right")
+    result_table.add_column("类型", justify="left")
+    result_table.add_column("数量", justify="right")
+    for i, (suffix, count) in enumerate(suffix_stats, 1):
+        result_table.add_row(str(i), suffix, str(count))
+    console.print(result_table)
+
+
+def preprocess(list_file, urls):
+    # 获取预定义URL
+    predefined_urls = []
+    if list_file:
+        try:
+            with open(list_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        more_urls = [url.strip() for url in line.split(",") if url.strip()]
+                        predefined_urls.extend(more_urls)
+        except Exception as e:
+            logger.error(f"读取文件失败: {list_file}, error={e}", exc_info=True)
+
+    if urls:
+        predefined_urls.extend(url.strip() for url in urls.split(",") if url.strip())
+    urls = [url for url in predefined_urls if validate_url(url)]
+    return urls
+
+
+def simple_download(urls, save_path, formats, auth=None):
+    click.echo(
+        f"\n共选择 {click.style(str(len(urls)), fg='yellow')} 项资源，"
+        f"将保存到目录【{click.style(str(save_path), fg='yellow')} 】"
+    )
+
+    config_urls = parse_urls(urls, formats)
+    resource_dict = fetch_resources(config_urls, lambda data: extract_resource_url(data, formats))
+    total = len(resource_dict)
+
+    click.echo(
+        f"\n输入的有效链接共 {click.style(str(len(urls)), fg='yellow')} 个；"
+        f"\n解析得配置链接共 {click.style(str(len(config_urls)), fg='yellow')} 个；"
+        f"\n最终的资源文件共 {click.style(str(total), fg='yellow')} 个。"
+    )
+    for u in config_urls:
+        logging.info(u)
+    if total == 0:
+        click.echo("\n没有找到资源文件（PDF/MP3等）。结束下载")
+        return
+
+    console = Console()
+    display_stats(console, resource_dict)
+
+    # 开始下载
+    start_time = time.time()
+    click.echo("\n开始下载文件...")
+
+    # 下载文件
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+    ) as progress:
+        download_task = progress.add_task("正在下载文件...", total=total)
+        results = download_files(resource_dict, save_path, auth=auth)
+        progress.update(download_task, completed=total)
+
+    # 显示统计信息
+    elapsed_time = time.time() - start_time
+    display_results(console, results, elapsed_time)
+
+
+def _interactive_mode1(book_base, retry=3):
+    book_history = [book_base.children[0]]
+    options = []
+    urls_to_process = []
+    flag = True
+
+    while flag:
+        current_book = book_history[-1]
+        step = current_book.level
+        title, options, children, is_book = query_metadata(current_book)
+        if step > 1 and is_book:
+            break
+        if step > 1 and len(children) == 0:
+            click.secho(f"当前教材为空，返回上级菜单", fg="blue")
+            book_history.pop()
+            continue
+
+        note = "，输入0返回上一级" if step > 1 else ""
+        note_title = f"{step}. 请选择以下{title}中的某项（共{len(options)}项{note}）"
+        option_names = [op[1] for op in options]
+        for i in range(retry):
+            display_entries(option_names, note_title, title)
+            selected_index = click.prompt("请选择", default=FIRST_KEY, show_default=True)
+            selected_index = selected_index.strip().lower()
+
+            if selected_index == EXIT_KEY:
+                click.secho(f"输入为「{EXIT_KEY}」，退出当前模式", fg="red")
+                return []
+
+            if step > 1 and selected_index == ZERO_KEY:
+                click.secho(f"输入为「{ZERO_KEY}」，返回上级菜单", fg="blue")
+                book_history.pop()
+                break
+
+            if selected_index.isdigit() and 1 <= int(selected_index) <= len(options):
+                # 更新到下一级
+                selected_index_val = int(selected_index) - 1
+                book_history.append(children[selected_index_val])
+                break
+            else:
+                click.secho(f"输入不合法，请重新输入（第{i + 1}/{retry}次）", fg="red")
+        else:
+            logging.debug("错误次数过多，重置")
+            book_history = [book_base.children[0]]
+
+    if options:
+        selected_option = "教材课本"
+        name2 = title if title else selected_option
+        option_names = [op[1] for op in options]
+        note_title = f"当前选择的【{selected_option}】共{len(options)}项，如下"
+        display_entries(option_names, note_title, name2)
+        urls_to_process = gen_url_from_tags([cid for cid, _ in options])
+
+    return urls_to_process
+
+
+def _interactive_mode2(retry=3):
+    for i in range(retry):
+        note = click.style("「smartedu.cn」", fg="blue", bold=True)
+        click.echo(f"\n请输入包含{note}资源的URL（逗号分隔）：")
+        input_urls = click.prompt("")
+        input_urls = input_urls.strip().lower()
+        if input_urls == EXIT_KEY:  # 退出
+            return []
+
+        urls_to_process = [url.strip() for url in input_urls.split(",") if validate_url(url)]
+        if urls_to_process:
+            display_entries(urls_to_process, "已输入列表", "有效URL")
+            break
+        click.secho(f"未输入有效URL，请重新输入（第{i + 1}/{retry}次）", fg="red")
+    return urls_to_process
+
+
+def _interactive_filter(urls_to_process, retry=3):
+    selected_urls = []
+    for i in range(retry):
+        note = "（输入序号或者序号范围，如: 1-3,5,7-9；默认全部）"
+        click.echo(f"\n请选择以上候选中需下载项：\n{note}")
+        range_input = click.prompt("请输入", default=ALL_KEY.upper(), show_default=True)
+        if range_input == EXIT_KEY:
+            click.secho(f"输入为「{EXIT_KEY}」，退出当前模式", fg="red")
+            return []
+
+        selected_indices = parse_range(range_input, len(urls_to_process))
+        if selected_indices:
+            selected_urls = [urls_to_process[i - 1] for i in selected_indices]
+            break
+        click.secho(f"无效的选择，请重新输入（第{i + 1}/{retry}次）", fg="red")
+
+    resource_urls = []
+    for url in selected_urls:
+        if url.startswith("http"):
+            resource_urls.append(url)
+    return selected_urls
+
+
+def _interactive_path(save_path, retry=3):
+    for i in range(retry):
+        click.echo(f"\n设置保存路径: （默认路径={save_path}）")
+        if click.confirm("是否使用默认路径?", default=True):
+            break
+
+        save_path = click.prompt("请输入新的保存路径")
+        is_valid, validated_path = validate_save_path(save_path)
+        if is_valid:
+            save_path = validated_path
+            break
+        click.secho(f"无效的路径：【{save_path}】，请重新输入（第{i + 1}/{retry}次）", fg="red")
+    return save_path
+
+
+def interactive_download(default_output: str, audio: bool, auth: str = None, data_dir: str = None):
+    """交互式下载流程"""
+
+    book_base = None
+    mode_options = [
+        ["1", "查询教材列表"],
+        ["2", "手动输入URL"],
+        [ZERO_KEY, f"退出（或{EXIT_KEY}）"],
+    ]
+    while True:
+        note_title = "请选择下载模式（输入数字序号）"
+        display_entries(mode_options, note_title)
+
+        choice_values = [idx for idx, _ in mode_options] + [EXIT_KEY]
+        choice = click.prompt("请选择", type=click.Choice(choice_values), show_choices=True)
+        choice = choice.strip().lower()
+
+        if choice in choice_values[2:]:
+            click.echo("\n退出程序")
+            sys.exit(0)
+
+        # 获取URL列表
+        urls_to_process = []
+        if choice == choice_values[0]:
+            if book_base is None:
+                click.echo("\n联网查询教材数据中……")
+                book_base = fetch_metadata(data_dir)
+            if book_base is None or len(book_base.children) == 0:
+                click.secho("获取数据失败，请稍后再试", fg="red")
+                continue
+            urls_to_process = _interactive_mode1(book_base)
+        elif choice == choice_values[1]:
+            urls_to_process = _interactive_mode2()
+
+        if not urls_to_process:
+            continue
+
+        # 确认下载URL
+        resource_urls = _interactive_filter(urls_to_process)
+        if not resource_urls:
+            click.secho("没有找到可下载的有效URL", fg="red")
+            continue
+        # 确认保存路径
+        save_path = _interactive_path(default_output)
+
+        # 开始下载
+        simple_download(resource_urls, save_path, audio, auth)
+
+        # 询问是否继续
+        if not click.confirm("\n是否继续下载?", default=True, show_default=True):
+            click.echo("\n结束下载")
+            break
