@@ -103,6 +103,7 @@ def _extract_resource(data, suffix="pdf"):
     if not data2:
         return output
 
+    name_dict = {}
     for i, entry in enumerate(data2):
         # entry_id = entry['id']
         title = entry.get("title", f"{suffix.upper()}-{i:02d}")
@@ -114,7 +115,13 @@ def _extract_resource(data, suffix="pdf"):
 
         # jpg: entry["custom_properties"]["preview"]
         if resource_url:
-            output.append([f"{title}.{suffix}", _convert_url(resource_url), resource_url])
+            save_name = f"{title}.{suffix}"
+            if save_name in name_dict:
+                save_name = f"{title} ({name_dict[save_name]}).{suffix}"
+                name_dict[save_name] += 1
+            else:
+                name_dict[save_name] = 1
+            output.append([save_name, _convert_url(resource_url), resource_url])
     return output
 
 
