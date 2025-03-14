@@ -20,7 +20,7 @@ def test_tag_hierarchy():
     assert child_hier.name == "电子教材"
     assert len(child_hier.children) == 6
 
-    options = child_hier.get_options()
+    is_book, options = child_hier.get_options()
     option_titles = [opt[1] for opt in options]
     assert option_titles == [
         "小学",
