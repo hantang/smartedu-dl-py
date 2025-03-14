@@ -130,9 +130,9 @@ def display_results(console: Console, results: list, elapsed_time: float):
         console.print(result_table)
 
 
-def display_stats(console: Console, resource_dict: dict):
+def display_stats(console: Console, resource_list: list):
     suffix_stats = {}
-    for url, [name, raw_url] in resource_dict.items():
+    for name, raw_url, url, fix_url in resource_list:
         suffix = name.split(".")[-1]
         if suffix not in suffix_stats:
             suffix_stats[suffix] = 0
@@ -175,25 +175,24 @@ def simple_download(urls, save_path, formats, auth=None, activate_backup=False):
     )
 
     config_urls = parse_urls(urls, formats, activate_backup)
-    resource_dict = fetch_resources(config_urls, lambda data: extract_resource_url(data, formats))
-    total = len(resource_dict)
+    logger.debug("config_urls:")
+    for i, url in enumerate(config_urls):
+        logger.debug(f"{i+1}. {url}")
 
+    resource_list = fetch_resources(config_urls, lambda data: extract_resource_url(data, formats))
+    total = len(resource_list)
     click.echo(
         f"\n输入的有效链接共 {click.style(str(len(urls)), fg='yellow')} 个；"
         f"\n解析得配置链接共 {click.style(str(len(config_urls)), fg='yellow')} 个；"
         f"\n最终的资源文件共 {click.style(str(total), fg='yellow')} 个。"
     )
 
-    logger.debug("config_urls:")
-    for i, url in enumerate(config_urls):
-        logger.debug(f"{i+1}. {url}")
-
     if total == 0:
         click.echo("\n没有找到资源文件（PDF/MP3等）。结束下载")
         return
 
     console = Console()
-    display_stats(console, resource_dict)
+    display_stats(console, resource_list)
 
     # 开始下载
     start_time = time.time()
@@ -208,7 +207,7 @@ def simple_download(urls, save_path, formats, auth=None, activate_backup=False):
         console=console,
     ) as progress:
         download_task = progress.add_task("正在下载文件...", total=total)
-        results = download_files(resource_dict, save_path, auth=auth)
+        results = download_files(resource_list, save_path, auth=auth)
         progress.update(download_task, completed=total)
 
     # 显示统计信息

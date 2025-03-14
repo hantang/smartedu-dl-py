@@ -4,6 +4,7 @@ smartedu配置信息和解析
 
 import logging
 import random
+import re
 
 from urllib.parse import parse_qs, urlparse
 
@@ -11,11 +12,13 @@ from .configs.resources import DOMAIN_REMAP_DICT, RESOURCE_TYPE_DICT, RESOURCE_D
 from .configs.resources import FORMATS_REMAP, ACCEPTED_FORMATS, SERVER_LIST
 
 
-def _clean_url(resource_url):
+def _convert_url(resource_url):
     # https://r1-ndr-private.ykt.cbern.com.cn -> https://r1-ndr.ykt.cbern.com.cn
     logging.debug(f"Raw URL = {resource_url}")
-    new_url = resource_url.replace("ndr-doc-private.", "ndr.")
-    new_url = "/".join(new_url.split("/")[:-1] + ["pdf.pdf"])
+
+    new_url = resource_url
+    new_url = re.sub(r"[^/]+\.pdf$", "pdf.pdf", new_url)
+    new_url = re.sub("ndr-(doc-)?private", "ndr", new_url)
     logging.debug(f"New URL = {new_url}")
 
     return new_url
@@ -107,11 +110,11 @@ def _extract_resource(data, suffix="pdf"):
         for item in entry["ti_items"]:
             if item["ti_format"].lower().strip() == suffix and item["ti_storages"]:
                 resource_url = random.choice(item["ti_storages"])
-                resource_url = _clean_url(resource_url)
                 break
 
         # jpg: entry["custom_properties"]["preview"]
-        output.append([f"{title}.{suffix}", resource_url])
+        if resource_url:
+            output.append([f"{title}.{suffix}", _convert_url(resource_url), resource_url])
     return output
 
 
@@ -141,7 +144,7 @@ def gen_url_from_tags(content_id_list):
 def get_formats(formats):
     out = []
     if formats:
-        out = [v.strp() for v in formats.strip(",") if v.strip() in ACCEPTED_FORMATS]
+        out = [v.strip() for v in formats.strip(",") if v.strip() in ACCEPTED_FORMATS]
     if len(out) == 0:
         out = ["pdf"]
     return out

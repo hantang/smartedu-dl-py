@@ -21,12 +21,6 @@ def gen_filename(url, name, save_path, default="output.txt"):
     return new_filename
 
 
-def gen_filename2(save_file):
-    save_file = Path(save_file)
-    name = save_file.name
-    return gen_filename(None, name, save_file.parent)
-
-
 def clean_dir(temp_dir):
     # 清理临时文件
     try:
