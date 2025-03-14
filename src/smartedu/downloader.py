@@ -43,6 +43,35 @@ def download_files(url_list: list, output_dir: str, max_workers: int = 5, auth: 
     return results
 
 
+def download_files_tk(
+    app, base_progress, url_list: list, output_dir: str, max_workers: int = 5, auth: str = None
+) -> list:
+    """tk下载文件，更新进度条"""
+    save_dir = Path(output_dir)
+    if not save_dir.exists():
+        save_dir.mkdir(parents=True)
+
+    results = []
+    total = len(url_list)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_url = {
+            executor.submit(_download_file, url, name, save_dir, raw_url, fix_url, auth): url
+            for name, raw_url, url, fix_url in url_list
+        }
+        for future in as_completed(future_to_url):
+            # url = future_to_url[future]
+            result = future.result()
+            results.append(result)
+
+            # 更新GUI下载进度
+            finished = len(results)
+            app.progress_label.config(text=f"已经下载 {finished} / {total} 项资源...")
+            app.progress_var.set(base_progress + (finished / total) * (100 - base_progress))
+            app.update()
+
+    return results
+
+
 def fetch_resources(url_list: list, extract_func: Callable, max_workers: int = 5) -> list:
     """
     获取配置信息

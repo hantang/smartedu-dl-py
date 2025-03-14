@@ -78,23 +78,6 @@ def stream_download(
                 else:
                     fw.write(response.content)
 
-        if total_size == 0 or Path(file_path).stat().st_size != total_size:
+        if total_size == 0 or Path(file_path).exists() and Path(file_path).stat().st_size != total_size:
             raise RuntimeError("Could not download file")
         return status_code, total_size
-
-
-# def normal_download(url: str, file_path: str | Path, headers: dict, timeout: int=5):
-
-
-# def download_ts_file(url: str, output_path: str, headers: dict, timeout: int):
-#     # 非stream下载
-#     try:
-
-
-#     except requests.exceptions.RequestException as res_err:
-#         logging.warning(f"URL: {url}; Request Error: {res_err}")
-#     except IOError as io_err:
-#         logging.warning(f"URL: {url}; IO Error: {io_err}")
-#     except Exception as err:
-#         logging.error(f"Download failed: {url}, 错误: {err}")
-#     return False
