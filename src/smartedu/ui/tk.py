@@ -2,9 +2,9 @@ import logging
 import time
 import tkinter as tk
 import tkinter.font as tkFont
+
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-
 
 from ..configs.logo import DESCRIBES, LOGO_TEXT
 from ..configs.resources import RESOURCE_DICT
@@ -143,8 +143,7 @@ class BookSelectorFrame(ttk.Frame):
         # 获取第一级数据
         if self.book_base is None:
             self.hierarchy_frame.configure(text="联网查询教材数据中……")
-            # self.book_base = fetch_metadata(data_dir=None)
-            self.book_base = fetch_metadata(data_dir="../data/v2/", local=True)
+            self.book_base = fetch_metadata(data_dir=None)
 
         if self.book_base:
             self.hierarchy_frame.configure(text="查询完成")
@@ -159,19 +158,12 @@ class BookSelectorFrame(ttk.Frame):
         """更新层级和课本"""
         self._destroy_combobox(index)
         self.update_checkbox(None)
-        # self.level_options = []
-        # self.level_hiers = []
         if index < 0:
             return
 
         self.book_history = [self.book_base.children[0]]
         current_book = self.book_history[-1]  # [index]
-        step = current_book.level
         title, options, children, is_book = query_metadata(current_book)
-
-        # self.level_options = [()]
-        # selected_key = self.hier_dict["next"][0]
-        # _, name, options = self._query(selected_key)
 
         # 创建第一个下拉框
         self.create_combobox(0, title, options)
@@ -298,7 +290,9 @@ class BookSelectorFrame(ttk.Frame):
 
     def get_selected_urls(self) -> list[str]:
         """获取选中的URL列表"""
-        return gen_url_from_tags(list(self.selected_items))
+        items = list(self.selected_items)
+        logging.debug(f"items = {len(items)}, {items}")
+        return gen_url_from_tags(items)
 
 
 class InputURLAreaFrame(ttk.Frame):
@@ -316,7 +310,6 @@ class InputURLAreaFrame(ttk.Frame):
 
     def setup_ui(self):
         """初始化UI"""
-
         # 创建输入区域
         input_frame = ttk.LabelFrame(self, text="输入URL（每行一个）", padding=self.padx * 2)
         input_frame.pack(fill=tk.BOTH, expand=True, padx=self.padx, pady=self.pady)
@@ -368,13 +361,13 @@ class InputURLAreaFrame(ttk.Frame):
         return urls
 
 
-class DownloadApp(tk.Tk):
+class BasicDownloadApp(tk.Tk):
     """主应用窗口"""
 
     def __init__(self, scale=1.0, os_name=None):
         super().__init__()
-        self.frame_names = ["books", "inputs"]
-        self.frame_titles = ["教材列表", "手动输入"]
+        # self.tab_names = ["books", "inputs"]
+        self.tab_titles = ["教材列表", "手动输入"]
         self.desc_texts = DESCRIBES
         self.download_dir = Path.home() / "Downloads"  # 改为用户目录
 
@@ -458,42 +451,63 @@ class DownloadApp(tk.Tk):
             "<Configure>", lambda e: update_labels_wraplength(e, [slogan_label], self.scale)
         )
 
-    def setup_mode_frame(self, main_frame):
-        # 3. 模式选择：两个单选按钮
-        self.mode_var = tk.StringVar(value=self.frame_names[0])
-        mode_frame = ttk.Frame(main_frame)
-        mode_frame.pack(fill=tk.BOTH, expand=True, pady=self.pady)
+    # def setup_mode_frame_v1(self, main_frame):
+    #     # 3. 模式选择：两个单选按钮
+    #     self.mode_var = tk.StringVar(value=self.tab_names[0])
+    #     mode_frame = ttk.Frame(main_frame)
+    #     mode_frame.pack(fill=tk.BOTH, expand=True, pady=self.pady)
 
-        radio1 = ttk.Radiobutton(
-            mode_frame,
-            text=self.frame_titles[0],
-            value=self.frame_names[0],
-            variable=self.mode_var,
-            command=self.switch_mode,
-        )
+    #     radio1 = ttk.Radiobutton(
+    #         mode_frame,
+    #         text=self.tab_titles[0],
+    #         value=self.tab_names[0],
+    #         variable=self.mode_var,
+    #         command=self.switch_mode,
+    #     )
 
-        radio2 = ttk.Radiobutton(
-            mode_frame,
-            text=self.frame_titles[1],
-            value=self.frame_names[1],
-            variable=self.mode_var,
-            command=self.switch_mode,
-        )
-        radio1.pack(side=tk.LEFT, fill=tk.X, padx=self.padx * 2)
-        radio2.pack(side=tk.LEFT, fill=tk.X, padx=self.padx * 2)
+    #     radio2 = ttk.Radiobutton(
+    #         mode_frame,
+    #         text=self.tab_titles[1],
+    #         value=self.tab_names[1],
+    #         variable=self.mode_var,
+    #         command=self.switch_mode,
+    #     )
+    #     radio1.pack(side=tk.LEFT, fill=tk.X, padx=self.padx * 2)
+    #     radio2.pack(side=tk.LEFT, fill=tk.X, padx=self.padx * 2)
 
-        # 4. 内容区域，包括两个面板，单选控制
-        self.content_frame = ttk.Frame(main_frame)
-        self.content_frame.pack(fill=tk.BOTH, expand=True)
+    #     # 4. 内容区域，包括两个面板，单选控制
+    #     self.content_frame = ttk.Frame(main_frame)
+    #     self.content_frame.pack(fill=tk.BOTH, expand=True)
+    #     self.selector_frame = BookSelectorFrame(
+    #         self.content_frame, self.fonts, self.font_size, self.scale, self.os_name
+    #     )
+    #     self.inputs_frame = InputURLAreaFrame(
+    #         self.content_frame, self.fonts, self.font_size, self.scale, self.os_name
+    #     )
+
+    #     # 默认显示教材列表面板
+    #     self.selector_frame.pack(fill=tk.BOTH, expand=True, pady=self.pady * 2)
+
+    def setup_mode_frame(self, main_frame, tab_index=0):
+        # 3. 模式选择：两个标签页
+        self.mode_var = tk.StringVar(value=self.tab_titles[tab_index])
+        self.notebook = ttk.Notebook(main_frame)
+        self.notebook.pack(fill="both", expand=True)
+
+        # 4. 内容区域，包括两个面板
         self.selector_frame = BookSelectorFrame(
-            self.content_frame, self.fonts, self.font_size, self.scale, self.os_name
+            self.notebook, self.fonts, self.font_size, self.scale, self.os_name
         )
         self.inputs_frame = InputURLAreaFrame(
-            self.content_frame, self.fonts, self.font_size, self.scale, self.os_name
+            self.notebook, self.fonts, self.font_size, self.scale, self.os_name
         )
 
-        # 默认显示教材列表面板
-        self.selector_frame.pack(fill=tk.BOTH, expand=True, pady=self.pady * 2)
+        self.notebook.add(self.selector_frame, text=self.tab_titles[0])
+        self.notebook.add(self.inputs_frame, text=self.tab_titles[1])
+        self.notebook.bind("<<NotebookTabChanged>>", self.tab_selected)
+
+        default_frame = self.selector_frame if tab_index == 0 else self.inputs_frame
+        self.notebook.select(default_frame)
 
     def setup_control_frame(self, main_frame):
         # New: 资源类型选项
@@ -540,22 +554,23 @@ class DownloadApp(tk.Tk):
         extra_frame = ttk.Frame(main_frame)
         extra_frame.pack(fill=tk.X, pady=self.pady, expand=True)
 
+        # 登录信息 输入框
         auth_frame = ttk.Frame(extra_frame)
         auth_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
         ttk.Label(auth_frame, text="登录信息：").pack(side=tk.LEFT, padx=self.padx)
         self.auth_var = tk.StringVar(value="")
         auth_entry = ttk.Entry(auth_frame, textvariable=self.auth_var)
-        auth_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=self.pady)
+        auth_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=self.padx)
 
-        back_frame = ttk.Frame(extra_frame)
-        back_frame.pack(side=tk.RIGHT, fill=tk.X, expand=True)
-
+        # 备用解析 复选框
+        backup_frame = ttk.Frame(extra_frame)
+        backup_frame.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=self.padx * 2)
         self.backup_var = tk.BooleanVar()
         self.backup_var.set(False)
-        backup_cb = ttk.Checkbutton(back_frame, variable=self.backup_var)
-        backup_label = ttk.Label(back_frame, text=f"备用解析")
-        backup_cb.pack(side=tk.LEFT)
-        backup_label.pack(side=tk.LEFT)
+        backup_cb = ttk.Checkbutton(backup_frame, variable=self.backup_var)
+        backup_label = ttk.Label(backup_frame, text=f"备用解析")
+        backup_cb.pack(side=tk.RIGHT)
+        backup_label.pack(side=tk.RIGHT)
 
         # 底部添加进度条区域
         self.progress_frame = ttk.Frame(main_frame)
@@ -580,26 +595,36 @@ class DownloadApp(tk.Tk):
         if directory:
             self.dir_var.set(directory)
 
-    def switch_mode(self):
-        """切换模式"""
-        if self.mode_var.get() == self.frame_names[0]:
-            self.inputs_frame.pack_forget()
-            self.selector_frame.pack(fill=tk.BOTH, expand=True)
-        else:
-            self.selector_frame.pack_forget()
-            self.inputs_frame.pack(fill=tk.BOTH, expand=True)
-            self.inputs_frame.text.focus_set()  # 聚焦在输入框
+    # def switch_mode(self):
+    #     """切换模式"""
+    #     if self.mode_var.get() == self.tab_names[0]:
+    #         self.inputs_frame.pack_forget()
+    #         self.selector_frame.pack(fill=tk.BOTH, expand=True)
+    #     else:
+    #         self.selector_frame.pack_forget()
+    #         self.inputs_frame.pack(fill=tk.BOTH, expand=True)
+    #         self.inputs_frame.text.focus_set()  # 聚焦在输入框
+
+    def tab_selected(self, event):
+        """获取当前选中的标签页"""
+        tab_id = self.notebook.select()
+        tab_text = self.notebook.tab(tab_id, "text")
+        logging.debug(f"tab_id = {tab_id}, tab_text={tab_text}")
+        self.mode_var.set(tab_text)
 
     def start_download(self):
         """开始下载"""
         # 获取URL列表
-        if self.mode_var.get() == self.frame_names[0]:
+        current_tab = self.mode_var.get()
+        urls = []
+        if current_tab == self.tab_titles[0]:
             urls = self.selector_frame.get_selected_urls()
-        else:
+        elif current_tab == self.tab_titles[1]:
             urls = self.inputs_frame.get_urls()
+        logging.debug(f"tab name = {current_tab}, urls = {len(urls)}")
 
         if not urls:
-            messagebox.showwarning("警告", "请先选择要下载的资源或输入链接")
+            messagebox.showwarning("警告", f"请先在【{current_tab}】选择要下载的资源或输入链接")
             return
 
         suffix_list = [suffix for suffix, var in self.formats_vars.items() if var.get()]
@@ -659,7 +684,7 @@ class DownloadApp(tk.Tk):
         self.update()
 
         if total == 0:
-            logging.warning(f"\n没有找到资源文件（{'/'.join(suffix_list)}等）。结束下载")
+            logging.warning(f"没有找到资源文件（{'/'.join(suffix_list)}等）。结束下载")
             return None, None
 
         # 开始下载

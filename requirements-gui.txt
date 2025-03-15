@@ -1,0 +1,7 @@
+sv-ttk>=2.6.0
+darkdetect>=0.8.0
+# customtkinter>=5.2.2
+# CTkMessagebox
+# CTkMenuBar
+# toga>=0.4.9
+# PySide6>=6.8.0

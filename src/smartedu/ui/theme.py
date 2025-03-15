@@ -23,7 +23,7 @@ def set_theme(theme="auto", font_family=None, font_scale=1.0):
         return
     if theme == "auto":
         theme = darkdetect.theme()
-    logging.info(f"theme = {theme}")
+    logging.debug(f"theme = {theme}")
     sv_ttk.set_theme(theme)
 
     default_font = tkFont.nametofont("TkDefaultFont")

@@ -6,12 +6,12 @@ import argparse
 import logging
 
 from smartedu.ui.theme import set_dpi_scale, set_theme
-from smartedu.ui.tk import DownloadApp
+from smartedu.ui.tk import BasicDownloadApp
 
 
 def main(theme=None):
     scale, os_name = set_dpi_scale()
-    app = DownloadApp(scale, os_name)
+    app = BasicDownloadApp(scale, os_name)
     set_theme(theme=theme, font_scale=scale)
     app.eval("tk::PlaceWindow . center")
     app.mainloop()
