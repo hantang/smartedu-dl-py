@@ -3,8 +3,7 @@ name: Tests
 on:
   push:
     paths:
-      - "*.py"
-      - "*.pyw"
+      - "src/"
 
 jobs:
   run-test:
